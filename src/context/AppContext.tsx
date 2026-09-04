@@ -9,7 +9,8 @@ import {
   Transaction, 
   AuditLog, 
   DashboardMetrics,
-  TransactionType
+  TransactionType,
+  UserProfile
 } from '@/types/database';
 import { 
   DEMO_COMPANY, 
@@ -95,6 +96,14 @@ interface AppContextType {
   getDashboardMetrics: () => DashboardMetrics;
   getCashVsBankData: () => Array<{ name: string; value: number }>;
   getTransactionTimelineData: () => Array<{ date: string; receipts: number; payments: number }>;
+
+  // Authentication
+  currentUser: UserProfile | null;
+  isAuthenticated: boolean;
+  isHydrated: boolean;
+  login: (email: string, password?: string) => Promise<{ success: boolean; error?: string }>;
+  signUp: (email: string, password?: string, fullName?: string) => Promise<{ success: boolean; error?: string; message?: string }>;
+  logout: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -103,88 +112,246 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [currentCompany, setCurrentCompany] = useState<Company>(DEMO_COMPANY);
   const [companies] = useState<Company[]>(DEMO_COMPANIES);
   
-  const [accounts, setAccounts] = useState<Account[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('cashflow_accounts');
-      if (saved) {
-        try { return JSON.parse(saved); } catch (e) { console.error(e); }
-      }
-    }
-    return INITIAL_ACCOUNTS;
-  });
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [parties, setParties] = useState<Party[]>([]);
+  const [categories, setCategories] = useState<Category[]>(INITIAL_CATEGORIES);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [isHydrated, setIsHydrated] = useState(false);
 
-  const [parties, setParties] = useState<Party[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('cashflow_parties');
-      if (saved) {
-        try { return JSON.parse(saved); } catch (e) { console.error(e); }
-      }
-    }
-    return INITIAL_PARTIES;
-  });
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
 
-  const [categories, setCategories] = useState<Category[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('cashflow_categories');
-      if (saved) {
-        try { return JSON.parse(saved); } catch (e) { console.error(e); }
-      }
-    }
-    return INITIAL_CATEGORIES;
-  });
+  const loadUserDataForProfile = (user: UserProfile) => {
+    setCurrentUser(user);
+    if (typeof window === 'undefined') return;
 
-  const [transactions, setTransactions] = useState<Transaction[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('cashflow_transactions');
-      if (saved) {
-        try { return JSON.parse(saved); } catch (e) { console.error(e); }
-      }
-    }
-    return INITIAL_TRANSACTIONS;
-  });
+    localStorage.setItem('cashflow_user', JSON.stringify(user));
+    const storagePrefix = user.id === 'usr-admin-01' ? 'cashflow_demo_' : `cashflow_${user.id}_`;
 
-  const [auditLogs, setAuditLogs] = useState<AuditLog[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('cashflow_audit_logs');
-      if (saved) {
-        try { return JSON.parse(saved); } catch (e) { console.error(e); }
+    const savedAccounts = localStorage.getItem(`${storagePrefix}accounts`);
+    if (savedAccounts) {
+      setAccounts(JSON.parse(savedAccounts));
+    } else if (user.id === 'usr-admin-01') {
+      setAccounts(INITIAL_ACCOUNTS);
+    } else {
+      setAccounts([]);
+    }
+
+    const savedParties = localStorage.getItem(`${storagePrefix}parties`);
+    if (savedParties) {
+      setParties(JSON.parse(savedParties));
+    } else if (user.id === 'usr-admin-01') {
+      setParties(INITIAL_PARTIES);
+    } else {
+      setParties([]);
+    }
+
+    const savedCategories = localStorage.getItem(`${storagePrefix}categories`);
+    if (savedCategories) {
+      setCategories(JSON.parse(savedCategories));
+    } else {
+      setCategories(INITIAL_CATEGORIES);
+    }
+
+    const savedTransactions = localStorage.getItem(`${storagePrefix}transactions`);
+    if (savedTransactions) {
+      setTransactions(JSON.parse(savedTransactions));
+    } else if (user.id === 'usr-admin-01') {
+      setTransactions(INITIAL_TRANSACTIONS);
+    } else {
+      setTransactions([]);
+    }
+
+    const savedLogs = localStorage.getItem(`${storagePrefix}audit_logs`);
+    if (savedLogs) {
+      setAuditLogs(JSON.parse(savedLogs));
+    } else if (user.id === 'usr-admin-01') {
+      setAuditLogs(INITIAL_AUDIT_LOGS);
+    } else {
+      setAuditLogs([]);
+    }
+  };
+
+  // Hydrate from localStorage client-side once mounted to prevent SSR hydration mismatch
+  useEffect(() => {
+    try {
+      const savedUserStr = localStorage.getItem('cashflow_user');
+      if (savedUserStr) {
+        const user: UserProfile = JSON.parse(savedUserStr);
+        loadUserDataForProfile(user);
+      } else {
+        setCurrentUser(null);
+        setAccounts([]);
+        setParties([]);
+        setTransactions([]);
+        setAuditLogs([]);
+      }
+    } catch (e) {
+      console.error('Failed to load local storage state', e);
+    } finally {
+      setIsHydrated(true);
+    }
+  }, []);
+
+  const login = async (email: string, password?: string) => {
+    if (!email || !email.includes('@')) {
+      return { success: false, error: 'Please enter a valid corporate email address.' };
+    }
+    if (!password || password.length < 6) {
+      return { success: false, error: 'Password must be at least 6 characters.' };
+    }
+
+    try {
+      const { createClient } = await import('@/lib/supabase/client');
+      const supabase = createClient();
+      
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: password,
+      });
+
+      if (error) {
+        // Fallback for registered demo accounts if Supabase user not yet confirmed
+        if (email.toLowerCase() === 'admin@apex.corp' && password === 'admin123') {
+          const demoUser: UserProfile = {
+            id: 'usr-admin-01',
+            name: 'Anit Rajput',
+            email: 'admin@apex.corp',
+            role: 'owner',
+          };
+          loadUserDataForProfile(demoUser);
+          return { success: true };
+        }
+        return { success: false, error: error.message || 'Invalid credentials' };
+      }
+
+      if (data.user) {
+        const loggedUser: UserProfile = {
+          id: data.user.id,
+          name: data.user.user_metadata?.full_name || email.split('@')[0].toUpperCase(),
+          email: data.user.email || email,
+          role: 'accountant',
+        };
+        loadUserDataForProfile(loggedUser);
+        return { success: true };
+      }
+
+      return { success: false, error: 'User record not found.' };
+    } catch (err: any) {
+      // If network fails, check demo admin account credentials
+      if (email.toLowerCase() === 'admin@apex.corp' && password === 'admin123') {
+        const demoUser: UserProfile = {
+          id: 'usr-admin-01',
+          name: 'Anit Rajput',
+          email: 'admin@apex.corp',
+          role: 'owner',
+        };
+        loadUserDataForProfile(demoUser);
+        return { success: true };
+      }
+      return { success: false, error: err.message || 'Authentication failed' };
+    }
+  };
+
+  const signUp = async (email: string, password?: string, fullName?: string) => {
+    if (!email || !email.includes('@')) {
+      return { success: false, error: 'Please enter a valid corporate email address.' };
+    }
+    if (!password || password.length < 6) {
+      return { success: false, error: 'Password must be at least 6 characters.' };
+    }
+
+    try {
+      const { createClient } = await import('@/lib/supabase/client');
+      const supabase = createClient();
+
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password: password,
+        options: {
+          data: {
+            full_name: fullName || email.split('@')[0],
+          },
+        },
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      if (data.session && data.user) {
+        const loggedUser: UserProfile = {
+          id: data.user.id,
+          name: fullName || data.user.user_metadata?.full_name || email.split('@')[0].toUpperCase(),
+          email: data.user.email || email,
+          role: 'owner',
+        };
+        loadUserDataForProfile(loggedUser);
+        return { success: true };
+      }
+
+      return {
+        success: true,
+        message: 'Account registered successfully! Please sign in with your credentials.',
+      };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Registration failed' };
+    }
+  };
+
+  const logout = async () => {
+    try {
+      const { createClient } = await import('@/lib/supabase/client');
+      const supabase = createClient();
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setCurrentUser(null);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('cashflow_user');
+        window.location.href = '/login';
       }
     }
-    return INITIAL_AUDIT_LOGS;
-  });
+  };
 
   const [searchQuery, setSearchQuery] = useState<string>('');
 
-  // Persist state changes
+  // Persist state changes only after client hydration is complete
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('cashflow_accounts', JSON.stringify(accounts));
+    if (isHydrated && typeof window !== 'undefined' && currentUser) {
+      const storagePrefix = currentUser.id === 'usr-admin-01' ? 'cashflow_demo_' : `cashflow_${currentUser.id}_`;
+      localStorage.setItem(`${storagePrefix}accounts`, JSON.stringify(accounts));
     }
-  }, [accounts]);
+  }, [accounts, isHydrated, currentUser]);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('cashflow_parties', JSON.stringify(parties));
+    if (isHydrated && typeof window !== 'undefined' && currentUser) {
+      const storagePrefix = currentUser.id === 'usr-admin-01' ? 'cashflow_demo_' : `cashflow_${currentUser.id}_`;
+      localStorage.setItem(`${storagePrefix}parties`, JSON.stringify(parties));
     }
-  }, [parties]);
+  }, [parties, isHydrated, currentUser]);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('cashflow_categories', JSON.stringify(categories));
+    if (isHydrated && typeof window !== 'undefined' && currentUser) {
+      const storagePrefix = currentUser.id === 'usr-admin-01' ? 'cashflow_demo_' : `cashflow_${currentUser.id}_`;
+      localStorage.setItem(`${storagePrefix}categories`, JSON.stringify(categories));
     }
-  }, [categories]);
+  }, [categories, isHydrated, currentUser]);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('cashflow_transactions', JSON.stringify(transactions));
+    if (isHydrated && typeof window !== 'undefined' && currentUser) {
+      const storagePrefix = currentUser.id === 'usr-admin-01' ? 'cashflow_demo_' : `cashflow_${currentUser.id}_`;
+      localStorage.setItem(`${storagePrefix}transactions`, JSON.stringify(transactions));
     }
-  }, [transactions]);
+  }, [transactions, isHydrated, currentUser]);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('cashflow_audit_logs', JSON.stringify(auditLogs));
+    if (isHydrated && typeof window !== 'undefined' && currentUser) {
+      const storagePrefix = currentUser.id === 'usr-admin-01' ? 'cashflow_demo_' : `cashflow_${currentUser.id}_`;
+      localStorage.setItem(`${storagePrefix}audit_logs`, JSON.stringify(auditLogs));
     }
-  }, [auditLogs]);
+  }, [auditLogs, isHydrated, currentUser]);
 
   // Company Switcher
   const setCompany = (companyId: string) => {
@@ -742,6 +909,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         getDashboardMetrics,
         getCashVsBankData,
         getTransactionTimelineData,
+        currentUser,
+        isAuthenticated: Boolean(currentUser),
+        isHydrated,
+        login,
+        signUp,
+        logout,
       }}
     >
       {children}

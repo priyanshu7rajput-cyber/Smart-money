@@ -7,6 +7,14 @@ export type PartyType = 'customer' | 'supplier' | 'other';
 export type CategoryType = 'income' | 'expense';
 export type UserRole = 'owner' | 'admin' | 'accountant' | 'viewer';
 
+export interface UserProfile {
+  id: string;
+  email: string;
+  name: string;
+  role: UserRole;
+  avatar_url?: string;
+}
+
 export interface Company {
   id: string;
   name: string;

@@ -20,13 +20,15 @@ import {
   ArrowDownLeft, 
   ArrowUpRight,
   Building2,
-  ChevronDown
+  ChevronDown,
+  LogOut,
+  LogIn
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { currentCompany, companies, setCompany } = useApp();
+  const { currentCompany, companies, setCompany, currentUser, isAuthenticated, logout } = useApp();
 
   const navItems = [
     {
@@ -144,20 +146,36 @@ export function Sidebar() {
         ))}
       </div>
 
-      {/* User Footer */}
-      <div className="p-3 border-t border-slate-800 bg-slate-950/60 flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-full bg-slate-700 text-slate-200 flex items-center justify-center font-semibold text-xs border border-slate-600">
-            AM
+      {/* User & Logout Footer */}
+      <div className="p-3 border-t border-slate-800 bg-slate-950/60">
+        {isAuthenticated && currentUser ? (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs border border-blue-500 shadow-xs shrink-0">
+                {currentUser.name.substring(0, 2).toUpperCase()}
+              </div>
+              <div className="text-left leading-tight truncate">
+                <p className="text-xs font-semibold text-slate-200 truncate">{currentUser.name}</p>
+                <p className="text-[10px] text-slate-400 truncate">{currentUser.email}</p>
+              </div>
+            </div>
+            <button
+              onClick={() => logout()}
+              title="Logout session"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition-colors shrink-0 ml-1"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
           </div>
-          <div className="text-left leading-tight">
-            <p className="text-xs font-semibold text-slate-200">Accountant</p>
-            <p className="text-[10px] text-slate-400">admin@apex.corp</p>
-          </div>
-        </div>
-        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-900/60 text-blue-300 border border-blue-700/50">
-          PROD
-        </span>
+        ) : (
+          <Link
+            href="/login"
+            className="flex items-center justify-center gap-2 w-full py-2 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition-colors"
+          >
+            <LogIn className="w-4 h-4" />
+            <span>Sign In to Account</span>
+          </Link>
+        )}
       </div>
     </aside>
   );
