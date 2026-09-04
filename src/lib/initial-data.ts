@@ -1,0 +1,427 @@
+import { Account, Party, Category, Transaction, Company, AuditLog } from '@/types/database';
+
+export const DEMO_COMPANY: Company = {
+  id: 'c1010101-0000-0000-0000-000000000001',
+  name: 'Apex Global Enterprises Ltd.',
+  tax_id: 'GSTIN27AABCA1234F1Z5',
+  currency: 'INR',
+  currency_symbol: '₹',
+  financial_year_start: '2026-04-01',
+  created_at: '2026-01-01T00:00:00Z',
+  updated_at: '2026-01-01T00:00:00Z',
+};
+
+export const DEMO_COMPANIES: Company[] = [
+  DEMO_COMPANY,
+  {
+    id: 'c2020202-0000-0000-0000-000000000002',
+    name: 'BlueSky Logistics Pvt Ltd',
+    tax_id: 'GSTIN29AAACB9876Q1Z2',
+    currency: 'INR',
+    currency_symbol: '₹',
+    financial_year_start: '2026-04-01',
+    created_at: '2026-02-01T00:00:00Z',
+    updated_at: '2026-02-01T00:00:00Z',
+  }
+];
+
+export const INITIAL_ACCOUNTS: Account[] = [
+  {
+    id: 'acc-cash-main',
+    company_id: DEMO_COMPANY.id,
+    name: 'Main Cash Register',
+    type: 'cash',
+    opening_balance: 50000,
+    opening_balance_type: 'debit',
+    description: 'Cash safe at central office HQ',
+    status: 'active',
+    created_at: '2026-04-01T09:00:00Z',
+    updated_at: '2026-04-01T09:00:00Z',
+  },
+  {
+    id: 'acc-cash-petty',
+    company_id: DEMO_COMPANY.id,
+    name: 'Petty Cash Box',
+    type: 'cash',
+    opening_balance: 15000,
+    opening_balance_type: 'debit',
+    description: 'Daily office pantry and courier petty cash',
+    status: 'active',
+    created_at: '2026-04-01T09:00:00Z',
+    updated_at: '2026-04-01T09:00:00Z',
+  },
+  {
+    id: 'acc-bank-hdfc',
+    company_id: DEMO_COMPANY.id,
+    name: 'HDFC Corporate Current A/c',
+    type: 'bank',
+    bank_name: 'HDFC Bank',
+    account_number: '50200049281920',
+    ifsc: 'HDFC0001234',
+    branch: 'Fort, Mumbai',
+    opening_balance: 850000,
+    opening_balance_type: 'debit',
+    description: 'Primary operating business account',
+    status: 'active',
+    created_at: '2026-04-01T09:00:00Z',
+    updated_at: '2026-04-01T09:00:00Z',
+  },
+  {
+    id: 'acc-bank-icici',
+    company_id: DEMO_COMPANY.id,
+    name: 'ICICI Treasury Current A/c',
+    type: 'bank',
+    bank_name: 'ICICI Bank',
+    account_number: '001105023910',
+    ifsc: 'ICIC0000011',
+    branch: 'Nariman Point, Mumbai',
+    opening_balance: 420000,
+    opening_balance_type: 'debit',
+    description: 'Vendor disbursements & reserves',
+    status: 'active',
+    created_at: '2026-04-01T09:00:00Z',
+    updated_at: '2026-04-01T09:00:00Z',
+  },
+  {
+    id: 'acc-bank-sbi',
+    company_id: DEMO_COMPANY.id,
+    name: 'SBI Overdraft Account',
+    type: 'bank',
+    bank_name: 'State Bank of India',
+    account_number: '38192019482',
+    ifsc: 'SBIN0000300',
+    branch: 'Bandra Kurla Complex',
+    opening_balance: 100000,
+    opening_balance_type: 'debit',
+    description: 'Working capital OD facility',
+    status: 'active',
+    created_at: '2026-04-01T09:00:00Z',
+    updated_at: '2026-04-01T09:00:00Z',
+  },
+];
+
+export const INITIAL_PARTIES: Party[] = [
+  {
+    id: 'pty-01',
+    company_id: DEMO_COMPANY.id,
+    name: 'Reliance Digital Retail',
+    type: 'customer',
+    phone: '+91 98200 11223',
+    email: 'accounts@relianceretail.demo',
+    address: 'Maker Chambers IV, Nariman Point, Mumbai',
+    opening_balance: 120000,
+    status: 'active',
+    created_at: '2026-04-01T09:00:00Z',
+    updated_at: '2026-04-01T09:00:00Z',
+  },
+  {
+    id: 'pty-02',
+    company_id: DEMO_COMPANY.id,
+    name: 'Tata Consultancy Services',
+    type: 'customer',
+    phone: '+91 98210 33445',
+    email: 'billing@tcs.demo',
+    address: 'Air India Building, Nariman Point, Mumbai',
+    opening_balance: 340000,
+    status: 'active',
+    created_at: '2026-04-01T09:00:00Z',
+    updated_at: '2026-04-01T09:00:00Z',
+  },
+  {
+    id: 'pty-03',
+    company_id: DEMO_COMPANY.id,
+    name: 'Godrej Stationery & Tech Supplies',
+    type: 'supplier',
+    phone: '+91 97650 99881',
+    email: 'sales@godrejtech.demo',
+    address: 'Pirojshanagar, Vikhroli, Mumbai',
+    opening_balance: 45000,
+    status: 'active',
+    created_at: '2026-04-01T09:00:00Z',
+    updated_at: '2026-04-01T09:00:00Z',
+  },
+  {
+    id: 'pty-04',
+    company_id: DEMO_COMPANY.id,
+    name: 'Infosys BPM Solutions',
+    type: 'supplier',
+    phone: '+91 91234 56789',
+    email: 'vendorcare@infosysbpm.demo',
+    address: 'Electronics City, Hosur Road, Bangalore',
+    opening_balance: 85000,
+    status: 'active',
+    created_at: '2026-04-01T09:00:00Z',
+    updated_at: '2026-04-01T09:00:00Z',
+  },
+  {
+    id: 'pty-05',
+    company_id: DEMO_COMPANY.id,
+    name: 'Office Space Real Estate Landlord',
+    type: 'other',
+    phone: '+91 98330 44556',
+    email: 'rentals@realestateinfra.demo',
+    address: 'Lower Parel Commercial Complex, Mumbai',
+    opening_balance: 0,
+    status: 'active',
+    created_at: '2026-04-01T09:00:00Z',
+    updated_at: '2026-04-01T09:00:00Z',
+  }
+];
+
+export const INITIAL_CATEGORIES: Category[] = [
+  { id: 'cat-inc-1', company_id: DEMO_COMPANY.id, name: 'Consulting & Tech Services', type: 'income', description: 'Client fee revenue', status: 'active', created_at: '2026-04-01T09:00:00Z', updated_at: '2026-04-01T09:00:00Z' },
+  { id: 'cat-inc-2', company_id: DEMO_COMPANY.id, name: 'Software Product Sales', type: 'income', description: 'License and subscription revenue', status: 'active', created_at: '2026-04-01T09:00:00Z', updated_at: '2026-04-01T09:00:00Z' },
+  { id: 'cat-inc-3', company_id: DEMO_COMPANY.id, name: 'Interest & Investment Income', type: 'income', description: 'Bank interest receipts', status: 'active', created_at: '2026-04-01T09:00:00Z', updated_at: '2026-04-01T09:00:00Z' },
+  { id: 'cat-exp-1', company_id: DEMO_COMPANY.id, name: 'Office Rent & Facilities', type: 'expense', description: 'Monthly lease and maintenance', status: 'active', created_at: '2026-04-01T09:00:00Z', updated_at: '2026-04-01T09:00:00Z' },
+  { id: 'cat-exp-2', company_id: DEMO_COMPANY.id, name: 'Salaries & Staff Welfare', type: 'expense', description: 'Payroll and employee allowances', status: 'active', created_at: '2026-04-01T09:00:00Z', updated_at: '2026-04-01T09:00:00Z' },
+  { id: 'cat-exp-3', company_id: DEMO_COMPANY.id, name: 'Hardware & IT Infrastructure', type: 'expense', description: 'Laptops, cloud hosting and software', status: 'active', created_at: '2026-04-01T09:00:00Z', updated_at: '2026-04-01T09:00:00Z' },
+  { id: 'cat-exp-4', company_id: DEMO_COMPANY.id, name: 'Travel, Fuel & Courier', type: 'expense', description: 'Business travel and delivery', status: 'active', created_at: '2026-04-01T09:00:00Z', updated_at: '2026-04-01T09:00:00Z' },
+  { id: 'cat-exp-5', company_id: DEMO_COMPANY.id, name: 'Legal & Professional Charges', type: 'expense', description: 'Audit, advisory, secretarial fees', status: 'active', created_at: '2026-04-01T09:00:00Z', updated_at: '2026-04-01T09:00:00Z' },
+];
+
+export const INITIAL_TRANSACTIONS: Transaction[] = [
+  {
+    id: 'tx-001',
+    company_id: DEMO_COMPANY.id,
+    transaction_no: 'CR-000001',
+    transaction_type: 'cash_receipt',
+    transaction_date: '2026-09-01',
+    reference_no: 'REC-901',
+    narration: 'Cash collected on delivery for hardware consignment',
+    status: 'active',
+    created_at: '2026-09-01T10:30:00Z',
+    updated_at: '2026-09-01T10:30:00Z',
+    entries: [
+      {
+        id: 'te-001-1',
+        company_id: DEMO_COMPANY.id,
+        account_id: 'acc-cash-main',
+        debit: 25000,
+        credit: 0,
+      },
+      {
+        id: 'te-001-2',
+        company_id: DEMO_COMPANY.id,
+        account_id: 'acc-cash-main',
+        party_id: 'pty-01',
+        category_id: 'cat-inc-2',
+        debit: 0,
+        credit: 25000,
+      }
+    ]
+  },
+  {
+    id: 'tx-002',
+    company_id: DEMO_COMPANY.id,
+    transaction_no: 'BR-000001',
+    transaction_type: 'bank_receipt',
+    transaction_date: '2026-09-02',
+    reference_no: 'INV/2026/812',
+    utr_no: 'HDFCR202609020088192',
+    narration: 'NEFT settlement of enterprise software retainer invoice',
+    status: 'active',
+    created_at: '2026-09-02T11:15:00Z',
+    updated_at: '2026-09-02T11:15:00Z',
+    entries: [
+      {
+        id: 'te-002-1',
+        company_id: DEMO_COMPANY.id,
+        account_id: 'acc-bank-hdfc',
+        debit: 175000,
+        credit: 0,
+      },
+      {
+        id: 'te-002-2',
+        company_id: DEMO_COMPANY.id,
+        account_id: 'acc-bank-hdfc',
+        party_id: 'pty-02',
+        category_id: 'cat-inc-1',
+        debit: 0,
+        credit: 175000,
+      }
+    ]
+  },
+  {
+    id: 'tx-003',
+    company_id: DEMO_COMPANY.id,
+    transaction_no: 'CP-000001',
+    transaction_type: 'cash_payment',
+    transaction_date: '2026-09-03',
+    reference_no: 'VCH-0941',
+    narration: 'Office pantry supplies, high-speed cable connectors & courier',
+    status: 'active',
+    created_at: '2026-09-03T14:20:00Z',
+    updated_at: '2026-09-03T14:20:00Z',
+    entries: [
+      {
+        id: 'te-003-1',
+        company_id: DEMO_COMPANY.id,
+        account_id: 'acc-cash-petty',
+        party_id: 'pty-03',
+        category_id: 'cat-exp-4',
+        debit: 4200,
+        credit: 0,
+      },
+      {
+        id: 'te-003-2',
+        company_id: DEMO_COMPANY.id,
+        account_id: 'acc-cash-petty',
+        debit: 0,
+        credit: 4200,
+      }
+    ]
+  },
+  {
+    id: 'tx-004',
+    company_id: DEMO_COMPANY.id,
+    transaction_no: 'BP-000001',
+    transaction_type: 'bank_payment',
+    transaction_date: '2026-09-03',
+    reference_no: 'RENT-SEP-26',
+    cheque_no: '884920',
+    cheque_date: '2026-09-03',
+    narration: 'Headquarters commercial office rent for September 2026',
+    status: 'active',
+    created_at: '2026-09-03T16:00:00Z',
+    updated_at: '2026-09-03T16:00:00Z',
+    entries: [
+      {
+        id: 'te-004-1',
+        company_id: DEMO_COMPANY.id,
+        account_id: 'acc-bank-icici',
+        party_id: 'pty-05',
+        category_id: 'cat-exp-1',
+        debit: 85000,
+        credit: 0,
+      },
+      {
+        id: 'te-004-2',
+        company_id: DEMO_COMPANY.id,
+        account_id: 'acc-bank-icici',
+        debit: 0,
+        credit: 85000,
+      }
+    ]
+  },
+  {
+    id: 'tx-005',
+    company_id: DEMO_COMPANY.id,
+    transaction_no: 'TR-000001',
+    transaction_type: 'transfer',
+    transaction_date: '2026-09-04',
+    reference_no: 'CONTRA-01',
+    narration: 'Cash deposit from Main Cash Safe to HDFC Operating Bank Account',
+    status: 'active',
+    created_at: '2026-09-04T10:00:00Z',
+    updated_at: '2026-09-04T10:00:00Z',
+    entries: [
+      {
+        id: 'te-005-1',
+        company_id: DEMO_COMPANY.id,
+        account_id: 'acc-bank-hdfc', // Destination Bank Debited
+        debit: 30000,
+        credit: 0,
+      },
+      {
+        id: 'te-005-2',
+        company_id: DEMO_COMPANY.id,
+        account_id: 'acc-cash-main', // Source Cash Credited
+        debit: 0,
+        credit: 30000,
+      }
+    ]
+  },
+  {
+    id: 'tx-006',
+    company_id: DEMO_COMPANY.id,
+    transaction_no: 'TR-000002',
+    transaction_type: 'transfer',
+    transaction_date: '2026-09-04',
+    reference_no: 'IBT-8821',
+    utr_no: 'ICICR202609040019283',
+    narration: 'Inter-bank fund re-allocation: ICICI Treasury to SBI Overdraft',
+    status: 'active',
+    created_at: '2026-09-04T11:45:00Z',
+    updated_at: '2026-09-04T11:45:00Z',
+    entries: [
+      {
+        id: 'te-006-1',
+        company_id: DEMO_COMPANY.id,
+        account_id: 'acc-bank-sbi', // Destination Debited
+        debit: 50000,
+        credit: 0,
+      },
+      {
+        id: 'te-006-2',
+        company_id: DEMO_COMPANY.id,
+        account_id: 'acc-bank-icici', // Source Credited
+        debit: 0,
+        credit: 50000,
+      }
+    ]
+  },
+  {
+    id: 'tx-007',
+    company_id: DEMO_COMPANY.id,
+    transaction_no: 'BP-000002',
+    transaction_type: 'bank_payment',
+    transaction_date: '2026-09-04',
+    reference_no: 'IT-DEV-441',
+    utr_no: 'HDFCR202609040099482',
+    narration: 'Vendor settlement for Cloud Storage servers and security audit',
+    status: 'active',
+    created_at: '2026-09-04T12:30:00Z',
+    updated_at: '2026-09-04T12:30:00Z',
+    entries: [
+      {
+        id: 'te-007-1',
+        company_id: DEMO_COMPANY.id,
+        account_id: 'acc-bank-hdfc',
+        party_id: 'pty-04',
+        category_id: 'cat-exp-3',
+        debit: 32000,
+        credit: 0,
+      },
+      {
+        id: 'te-007-2',
+        company_id: DEMO_COMPANY.id,
+        account_id: 'acc-bank-hdfc',
+        debit: 0,
+        credit: 32000,
+      }
+    ]
+  },
+];
+
+export const INITIAL_AUDIT_LOGS: AuditLog[] = [
+  {
+    id: 'log-01',
+    company_id: DEMO_COMPANY.id,
+    action: 'CREATE',
+    module: 'ACCOUNT',
+    record_id: 'acc-bank-hdfc',
+    new_data: { name: 'HDFC Corporate Current A/c', opening_balance: 850000 },
+    ip_address: '192.168.1.101',
+    created_at: '2026-04-01T09:00:00Z',
+  },
+  {
+    id: 'log-02',
+    company_id: DEMO_COMPANY.id,
+    action: 'CREATE',
+    module: 'TRANSACTION',
+    record_id: 'tx-001',
+    new_data: { transaction_no: 'CR-000001', amount: 25000, type: 'cash_receipt' },
+    ip_address: '192.168.1.101',
+    created_at: '2026-09-01T10:30:00Z',
+  },
+  {
+    id: 'log-03',
+    company_id: DEMO_COMPANY.id,
+    action: 'CREATE',
+    module: 'TRANSACTION',
+    record_id: 'tx-005',
+    new_data: { transaction_no: 'TR-000001', amount: 30000, type: 'transfer' },
+    ip_address: '192.168.1.104',
+    created_at: '2026-09-04T10:00:00Z',
+  },
+];

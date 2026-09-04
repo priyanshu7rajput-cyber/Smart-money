@@ -1,10 +1,10 @@
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { DashboardView } from '@/components/dashboard/DashboardView';
+import { AuditLogsView } from '@/components/settings/AuditLogsView';
 
-export default function HomePage() {
+export default function AuditLogsPage() {
   return (
     <DashboardLayout>
-      <DashboardView />
+      <AuditLogsView />
     </DashboardLayout>
   );
 }
