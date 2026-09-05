@@ -16,6 +16,7 @@ import {
   ArrowLeftRight, 
   Eye, 
   Ban, 
+  Trash2,
   FileSpreadsheet, 
   Printer, 
   CheckCircle2, 
@@ -26,7 +27,7 @@ import { Transaction, TransactionType } from '@/types/database';
 import * as XLSX from 'xlsx';
 
 export function TransactionsListView() {
-  const { transactions, accounts, parties, currentCompany, voidTransaction, editTransaction } = useApp();
+  const { transactions, accounts, parties, currentCompany, voidTransaction, deleteTransaction, editTransaction } = useApp();
 
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
@@ -43,6 +44,7 @@ export function TransactionsListView() {
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isVoidOpen, setIsVoidOpen] = useState(false);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [voidReason, setVoidReason] = useState('');
 
@@ -104,6 +106,24 @@ export function TransactionsListView() {
       setIsDetailOpen(false);
     } else {
       setNotification({ type: 'error', message: res.error || 'Failed to void transaction.' });
+    }
+  };
+
+  const openDeleteDialog = (tx: Transaction) => {
+    setSelectedTx(tx);
+    setIsDeleteOpen(true);
+  };
+
+  const handleConfirmDelete = () => {
+    if (!selectedTx) return;
+
+    const res = deleteTransaction(selectedTx.id);
+    if (res.success) {
+      setNotification({ type: 'success', message: `Transaction ${selectedTx.transaction_no} has been permanently deleted.` });
+      setIsDeleteOpen(false);
+      setIsDetailOpen(false);
+    } else {
+      setNotification({ type: 'error', message: res.error || 'Failed to delete transaction.' });
     }
   };
 
@@ -393,12 +413,19 @@ export function TransactionsListView() {
                         {!isVoided && (
                           <button
                             onClick={() => openVoidDialog(tx)}
-                            className="p-1 text-rose-500 hover:text-rose-700 rounded hover:bg-rose-50 dark:hover:bg-rose-900/30"
+                            className="p-1 text-amber-500 hover:text-amber-700 rounded hover:bg-amber-50 dark:hover:bg-amber-900/30"
                             title="Void Financial Transaction"
                           >
                             <Ban className="w-4 h-4" />
                           </button>
                         )}
+                        <button
+                          onClick={() => openDeleteDialog(tx)}
+                          className="p-1 text-rose-500 hover:text-rose-700 rounded hover:bg-rose-50 dark:hover:bg-rose-900/30"
+                          title="Delete Transaction"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </td>
                     </tr>
                   );
@@ -532,14 +559,22 @@ export function TransactionsListView() {
                       Edit Narration / Date
                     </Button>
                     <Button 
-                      variant="danger" 
+                      variant="outline" 
                       size="sm" 
                       onClick={() => openVoidDialog(selectedTx)}
+                      className="text-amber-600 border-amber-300 hover:bg-amber-50"
                     >
                       Void Transaction
                     </Button>
                   </>
                 )}
+                <Button 
+                  variant="danger" 
+                  size="sm" 
+                  onClick={() => openDeleteDialog(selectedTx)}
+                >
+                  Delete Entry
+                </Button>
               </div>
               <Button variant="secondary" size="sm" onClick={() => setIsDetailOpen(false)}>
                 Close
@@ -561,7 +596,7 @@ export function TransactionsListView() {
             <div className="p-3 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg text-xs">
               <p className="font-bold">CAUTION: Permanent Audit Trail</p>
               <p className="mt-0.5">
-                Financial records are not hard-deleted. Voiding will remove this entry from active balance calculations while preserving full audit history.
+                Voiding will remove this entry from active balance calculations while preserving full audit history.
               </p>
             </div>
 
@@ -579,6 +614,34 @@ export function TransactionsListView() {
               </Button>
               <Button variant="danger" size="sm" onClick={handleConfirmVoid}>
                 Confirm & Void Transaction
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Confirmation Delete Modal */}
+      {selectedTx && (
+        <Modal
+          isOpen={isDeleteOpen}
+          onClose={() => setIsDeleteOpen(false)}
+          title={`Delete Transaction ${selectedTx.transaction_no}`}
+          description="Are you sure you want to permanently delete this transaction record?"
+        >
+          <div className="space-y-4">
+            <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-lg text-xs">
+              <p className="font-bold">WARNING: Permanent Deletion</p>
+              <p className="mt-0.5">
+                This transaction record will be completely removed from the register.
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" size="sm" onClick={() => setIsDeleteOpen(false)}>
+                Cancel
+              </Button>
+              <Button variant="danger" size="sm" onClick={handleConfirmDelete}>
+                Delete Permanently
               </Button>
             </div>
           </div>

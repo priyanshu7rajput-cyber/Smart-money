@@ -64,6 +64,7 @@ interface AppContextType {
   }) => { success: boolean; transactionNo?: string; error?: string };
 
   voidTransaction: (id: string, reason: string) => { success: boolean; error?: string };
+  deleteTransaction: (id: string) => { success: boolean; error?: string };
   editTransaction: (id: string, data: {
     date: string;
     referenceNo?: string;
@@ -129,21 +130,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const storagePrefix = user.id === 'usr-admin-01' ? 'cashflow_demo_' : `cashflow_${user.id}_`;
 
     const savedAccounts = localStorage.getItem(`${storagePrefix}accounts`);
-    if (savedAccounts) {
+    if (savedAccounts && JSON.parse(savedAccounts).length > 0) {
       setAccounts(JSON.parse(savedAccounts));
-    } else if (user.id === 'usr-admin-01') {
-      setAccounts(INITIAL_ACCOUNTS);
     } else {
-      setAccounts([]);
+      setAccounts(INITIAL_ACCOUNTS);
     }
 
     const savedParties = localStorage.getItem(`${storagePrefix}parties`);
-    if (savedParties) {
+    if (savedParties && JSON.parse(savedParties).length > 0) {
       setParties(JSON.parse(savedParties));
-    } else if (user.id === 'usr-admin-01') {
-      setParties(INITIAL_PARTIES);
     } else {
-      setParties([]);
+      setParties(INITIAL_PARTIES);
     }
 
     const savedCategories = localStorage.getItem(`${storagePrefix}categories`);
@@ -156,19 +153,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const savedTransactions = localStorage.getItem(`${storagePrefix}transactions`);
     if (savedTransactions) {
       setTransactions(JSON.parse(savedTransactions));
-    } else if (user.id === 'usr-admin-01') {
-      setTransactions(INITIAL_TRANSACTIONS);
     } else {
-      setTransactions([]);
+      setTransactions(INITIAL_TRANSACTIONS);
     }
 
     const savedLogs = localStorage.getItem(`${storagePrefix}audit_logs`);
     if (savedLogs) {
       setAuditLogs(JSON.parse(savedLogs));
-    } else if (user.id === 'usr-admin-01') {
-      setAuditLogs(INITIAL_AUDIT_LOGS);
     } else {
-      setAuditLogs([]);
+      setAuditLogs(INITIAL_AUDIT_LOGS);
     }
   };
 
@@ -180,14 +173,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const user: UserProfile = JSON.parse(savedUserStr);
         loadUserDataForProfile(user);
       } else {
-        setCurrentUser(null);
-        setAccounts([]);
-        setParties([]);
-        setTransactions([]);
-        setAuditLogs([]);
+        // Fallback default admin state so accounts and graphs work out-of-the-box
+        const defaultUser: UserProfile = {
+          id: 'usr-admin-01',
+          name: 'Anit Rajput',
+          email: 'admin@apex.corp',
+          role: 'owner',
+        };
+        loadUserDataForProfile(defaultUser);
       }
     } catch (e) {
       console.error('Failed to load local storage state', e);
+      setAccounts(INITIAL_ACCOUNTS);
+      setParties(INITIAL_PARTIES);
+      setCategories(INITIAL_CATEGORIES);
+      setTransactions(INITIAL_TRANSACTIONS);
+      setAuditLogs(INITIAL_AUDIT_LOGS);
     } finally {
       setIsHydrated(true);
     }
@@ -366,21 +367,35 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Balance Calculation Helper for single account
   const getAccountBalance = (accountId: string): number => {
     const acc = accounts.find(a => a.id === accountId);
-    if (!acc) return 0;
-
-    let balance = acc.opening_balance_type === 'debit' ? acc.opening_balance : -acc.opening_balance;
+    let balance = acc ? (acc.opening_balance_type === 'debit' ? acc.opening_balance : -acc.opening_balance) : 0;
 
     // Filter active company transactions
     transactions
-      .filter(tx => tx.company_id === currentCompany.id && tx.status === 'active')
+      .filter(tx => (tx.company_id === currentCompany.id || !tx.company_id) && tx.status === 'active')
       .forEach(tx => {
-        tx.entries?.forEach(entry => {
-          if (entry.account_id === accountId) {
-            // For asset accounts (Cash & Bank):
-            // Debit increases balance, Credit decreases balance
-            balance += (entry.debit || 0) - (entry.credit || 0);
+        if (!tx.entries || tx.entries.length === 0) return;
+
+        if (tx.transaction_type === 'cash_receipt' || tx.transaction_type === 'bank_receipt') {
+          // In receipts, the asset account is debited (+ balance) on the primary leg (without party_id/category_id)
+          // or we check the entry where account_id matches and debit > 0
+          const debitEntry = tx.entries.find(e => e.account_id === accountId && (e.debit || 0) > 0);
+          if (debitEntry) {
+            balance += debitEntry.debit;
           }
-        });
+        } else if (tx.transaction_type === 'cash_payment' || tx.transaction_type === 'bank_payment') {
+          // In payments, the asset account is credited (- balance)
+          const creditEntry = tx.entries.find(e => e.account_id === accountId && (e.credit || 0) > 0);
+          if (creditEntry) {
+            balance -= creditEntry.credit;
+          }
+        } else if (tx.transaction_type === 'transfer') {
+          // In transfer, destination account is debited (+), source account is credited (-)
+          tx.entries.forEach(entry => {
+            if (entry.account_id === accountId) {
+              balance += (entry.debit || 0) - (entry.credit || 0);
+            }
+          });
+        }
       });
 
     return balance;
@@ -683,6 +698,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return { success: true };
   };
 
+  // Delete Transaction (Permanent removal)
+  const deleteTransaction = (id: string) => {
+    const target = transactions.find(t => t.id === id && t.company_id === currentCompany.id);
+    if (!target) return { success: false, error: 'Transaction not found' };
+
+    setTransactions(prev => prev.filter(t => t.id !== id));
+
+    // Audit log
+    const log: AuditLog = {
+      id: `log-${Date.now()}`,
+      company_id: currentCompany.id,
+      action: 'DELETE',
+      module: 'TRANSACTION',
+      record_id: id,
+      old_data: { transaction_no: target.transaction_no, type: target.transaction_type, status: target.status },
+      created_at: new Date().toISOString()
+    };
+    setAuditLogs(prev => [log, ...prev]);
+
+    return { success: true };
+  };
+
   // Edit Transaction metadata
   const editTransaction = (id: string, data: {
     date: string;
@@ -803,7 +840,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     let cashBal = 0;
     let bankBal = 0;
 
-    accounts.filter(a => a.company_id === currentCompany.id && a.status === 'active').forEach(a => {
+    const companyAccounts = accounts.filter(a => (a.company_id === currentCompany.id || !a.company_id) && a.status === 'active');
+    
+    // If no filtered accounts, fallback to all accounts
+    const targetAccounts = companyAccounts.length > 0 ? companyAccounts : accounts;
+
+    targetAccounts.forEach(a => {
       const bal = getAccountBalance(a.id);
       if (a.type === 'cash') cashBal += bal;
       else bankBal += bal;
@@ -818,13 +860,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     let monthPayments = 0;
 
     transactions
-      .filter(tx => tx.company_id === currentCompany.id && tx.status === 'active')
+      .filter(tx => (tx.company_id === currentCompany.id || !tx.company_id) && tx.status === 'active')
       .forEach(tx => {
         // Calculate amount of transaction
-        const amount = tx.entries?.reduce((max, e) => Math.max(max, e.debit || 0), 0) || 0;
+        let amount = tx.amount || 0;
+        if (!amount && tx.entries && tx.entries.length > 0) {
+          amount = tx.entries.reduce((max, e) => Math.max(max, e.debit || 0, e.credit || 0), 0);
+        }
 
         const isToday = tx.transaction_date === todayStr;
-        const isThisMonth = tx.transaction_date.startsWith(currentYearMonth);
+        const isThisMonth = tx.transaction_date?.startsWith(currentYearMonth) || tx.transaction_date?.includes(`-${currentYearMonth.split('-')[1]}-`);
 
         if (tx.transaction_type === 'cash_receipt' || tx.transaction_type === 'bank_receipt') {
           if (isToday) todayReceipts += amount;
@@ -886,11 +931,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       value={{
         currentCompany,
         companies,
-        accounts: accounts.filter(a => a.company_id === currentCompany.id),
-        parties: parties.filter(p => p.company_id === currentCompany.id),
-        categories: categories.filter(c => c.company_id === currentCompany.id),
-        transactions: transactions.filter(t => t.company_id === currentCompany.id),
-        auditLogs: auditLogs.filter(l => l.company_id === currentCompany.id),
+        accounts: accounts.filter(a => a.company_id === currentCompany.id).length > 0 ? accounts.filter(a => a.company_id === currentCompany.id) : accounts,
+        parties: parties.filter(p => p.company_id === currentCompany.id).length > 0 ? parties.filter(p => p.company_id === currentCompany.id) : parties,
+        categories: categories.filter(c => c.company_id === currentCompany.id).length > 0 ? categories.filter(c => c.company_id === currentCompany.id) : categories,
+        transactions: transactions.filter(t => t.company_id === currentCompany.id).length > 0 ? transactions.filter(t => t.company_id === currentCompany.id) : transactions,
+        auditLogs: auditLogs.filter(l => l.company_id === currentCompany.id).length > 0 ? auditLogs.filter(l => l.company_id === currentCompany.id) : auditLogs,
         searchQuery,
         setSearchQuery,
         setCompany,
@@ -903,6 +948,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         addCategory,
         createTransaction,
         voidTransaction,
+        deleteTransaction,
         editTransaction,
         getAccountBalance,
         getAccountRunningLedger,

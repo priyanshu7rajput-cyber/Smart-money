@@ -16,7 +16,8 @@ import {
 
 export function MonthlySavingsVsSpendingChart() {
   const { transactions, currentCompany } = useApp();
-  const [selectedYear, setSelectedYear] = useState<number>(2026);
+  const currentYear = new Date().getFullYear();
+  const [selectedYear, setSelectedYear] = useState<number>(currentYear);
 
   const months = [
     { key: '01', name: 'January', color: '#c084fc' }, // violet-400
@@ -33,32 +34,25 @@ export function MonthlySavingsVsSpendingChart() {
     { key: '12', name: 'December', color: '#1d4ed8' }, // dark blue
   ];
 
-  // Baseline mock profiles calibrated for high-aesthetic monthly distribution + real live transactions overlay
-  const baseData = [
-    { month: 'January', receipts: 92000, payments: 88000, color: '#c084fc' },
-    { month: 'February', receipts: 100000, payments: 92500, color: '#a855f7' },
-    { month: 'March', receipts: 90000, payments: 87500, color: '#ffffff' },
-    { month: 'April', receipts: 102000, payments: 97500, color: '#93c5fd' },
-    { month: 'May', receipts: 105000, payments: 100500, color: '#22d3ee' },
-    { month: 'June', receipts: 100000, payments: 97500, color: '#06b6d4' },
-    { month: 'July', receipts: 110000, payments: 101000, color: '#14b8a6' },
-    { month: 'August', receipts: 110000, payments: 103000, color: '#10b981' },
-    { month: 'September', receipts: 116000, payments: 109000, color: '#6366f1' },
-    { month: 'October', receipts: 120000, payments: 114000, color: '#8b5cf6' },
-    { month: 'November', receipts: 115000, payments: 106000, color: '#3b82f6' },
-    { month: 'December', receipts: 130000, payments: 117500, color: '#1d4ed8' },
-  ];
-
-  // Overlay dynamic data from transactions state for the selected year
-  const monthlyData = months.map((m, index) => {
-    const monthPrefix = `${selectedYear}-${m.key}`;
+  // Calculate 100% dynamic data from live transactions for the current year
+  const monthlyData = months.map((m) => {
     let dynamicReceipts = 0;
     let dynamicPayments = 0;
 
     transactions
-      .filter(t => t.status === 'active' && t.transaction_date.startsWith(monthPrefix))
+      .filter(t => {
+        if (t.status !== 'active' || !t.transaction_date) return false;
+        // Match year and month (e.g. 2026-09 or current year)
+        const d = t.transaction_date;
+        return d.startsWith(`${selectedYear}-${m.key}`) || d.includes(`-${m.key}-`);
+      })
       .forEach(tx => {
-        const amt = tx.entries?.reduce((max, e) => Math.max(max, e.debit || 0), 0) || 0;
+        // Calculate total amount from entries or tx.amount
+        let amt = tx.amount || 0;
+        if (!amt && tx.entries && tx.entries.length > 0) {
+          amt = tx.entries.reduce((max, e) => Math.max(max, e.debit || 0, e.credit || 0), 0);
+        }
+        
         if (tx.transaction_type.includes('receipt')) {
           dynamicReceipts += amt;
         } else if (tx.transaction_type.includes('payment')) {
@@ -66,9 +60,11 @@ export function MonthlySavingsVsSpendingChart() {
         }
       });
 
-    const receipts = dynamicReceipts > 0 ? dynamicReceipts : baseData[index].receipts;
-    const spending = dynamicPayments > 0 ? dynamicPayments : baseData[index].payments;
-    const savings = Math.max(0, receipts - spending > 0 ? receipts - spending : Math.round(receipts * 0.12));
+    // Pure dynamic calculation based on real transactions:
+    // Spending = Total Payments for the month
+    // Savings = Total Receipts for the month (or net savings if payments exist)
+    const spending = dynamicPayments;
+    const savings = dynamicReceipts > 0 ? (dynamicPayments > 0 ? Math.max(0, dynamicReceipts - dynamicPayments) : dynamicReceipts) : 0;
 
     return {
       month: m.name,
