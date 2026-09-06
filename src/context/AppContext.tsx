@@ -41,7 +41,6 @@ interface AppContextType {
   deleteAccount: (id: string) => { success: boolean; error?: string };
 
   // Party operations
-  parties: Party[];
   customPartyRoles: string[];
   addPartyRole: (role: string) => void;
   addParty: (party: Omit<Party, 'id' | 'created_at' | 'updated_at' | 'company_id'>) => { success: boolean; party?: Party; error?: string };
