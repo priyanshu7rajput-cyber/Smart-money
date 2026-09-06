@@ -3,7 +3,7 @@ export type BalanceType = 'debit' | 'credit';
 export type StatusType = 'active' | 'inactive';
 export type TransactionType = 'cash_receipt' | 'cash_payment' | 'bank_receipt' | 'bank_payment' | 'transfer';
 export type TransactionStatus = 'active' | 'voided';
-export type PartyType = 'customer' | 'supplier' | 'other';
+export type PartyType = 'customer' | 'supplier' | 'other' | (string & {});
 export type CategoryType = 'income' | 'expense';
 export type UserRole = 'owner' | 'admin' | 'accountant' | 'viewer';
 

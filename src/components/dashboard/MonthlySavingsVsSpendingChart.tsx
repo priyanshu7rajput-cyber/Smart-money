@@ -15,9 +15,10 @@ import {
 } from 'recharts';
 
 export function MonthlySavingsVsSpendingChart() {
-  const { transactions, currentCompany } = useApp();
+  const { transactions, currentCompany, currentUser } = useApp();
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
+  const displayName = currentUser?.name || currentUser?.email || 'My Account';
 
   const months = [
     { key: '01', name: 'January', color: '#c084fc' }, // violet-400
@@ -113,7 +114,7 @@ export function MonthlySavingsVsSpendingChart() {
           </span>
         </h2>
         <p className="text-xs sm:text-sm text-slate-400 mt-2 max-w-lg mx-auto font-medium">
-          Comprehensive cash preservation analytics & expenditure flow for {currentCompany.name}
+          Comprehensive cash preservation analytics & expenditure flow for {displayName}
         </p>
       </div>
 

@@ -44,7 +44,8 @@ export function DashboardView() {
     getTransactionTimelineData, 
     transactions,
     accounts,
-    currentCompany 
+    currentCompany,
+    currentUser
   } = useApp();
 
   const metrics = getDashboardMetrics();
@@ -55,6 +56,8 @@ export function DashboardView() {
 
   // Recent transactions list
   const recentTransactions = transactions.slice(0, 6);
+
+  const displayName = currentUser?.name || currentUser?.email || 'My Account';
 
   return (
     <div className="space-y-6">
@@ -68,7 +71,7 @@ export function DashboardView() {
             </span>
           </div>
           <p className="text-xs text-slate-300 mt-1">
-            Real-time multi-account cash flow monitoring for <strong className="text-white">{currentCompany.name}</strong>
+            Real-time multi-account cash flow monitoring for <strong className="text-white">{displayName}</strong>
           </p>
         </div>
 

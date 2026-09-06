@@ -11,11 +11,13 @@ import { PartyType } from '@/types/database';
 import { formatCurrency } from '@/lib/utils';
 
 export function PartiesView() {
-  const { parties, currentCompany, addParty, updateParty } = useApp();
+  const { parties, currentCompany, addParty, updateParty, customPartyRoles, addPartyRole } = useApp();
   const [search, setSearch] = useState('');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [name, setName] = useState('');
-  const [type, setType] = useState<PartyType>('customer');
+  const [type, setType] = useState<string>('Customer');
+  const [isCustomRoleInput, setIsCustomRoleInput] = useState(false);
+  const [customRoleText, setCustomRoleText] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [address, setAddress] = useState('');
@@ -147,18 +149,78 @@ export function PartiesView() {
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                Party Role
-              </label>
-              <select
-                value={type}
-                onChange={(e) => setType(e.target.value as PartyType)}
-                className="flex h-9.5 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm text-slate-900 dark:text-slate-100 focus:outline-none"
-              >
-                <option value="customer">Customer</option>
-                <option value="supplier">Supplier / Vendor</option>
-                <option value="other">Other Entity</option>
-              </select>
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Party Role
+                </label>
+                {!isCustomRoleInput ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCustomRoleInput(true);
+                      setCustomRoleText('');
+                    }}
+                    className="text-[10px] text-blue-600 hover:text-blue-700 dark:text-blue-400 font-semibold flex items-center gap-0.5"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>New Role</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setIsCustomRoleInput(false)}
+                    className="text-[10px] text-slate-400 hover:text-slate-600 font-semibold"
+                  >
+                    Cancel
+                  </button>
+                )}
+              </div>
+
+              {!isCustomRoleInput ? (
+                <select
+                  value={type}
+                  onChange={(e) => {
+                    if (e.target.value === '__add_new__') {
+                      setIsCustomRoleInput(true);
+                      setCustomRoleText('');
+                    } else {
+                      setType(e.target.value);
+                    }
+                  }}
+                  className="flex h-9.5 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm text-slate-900 dark:text-slate-100 focus:outline-none cursor-pointer"
+                >
+                  {customPartyRoles.map(r => (
+                    <option key={r} value={r}>
+                      {r}
+                    </option>
+                  ))}
+                  <option value="__add_new__">+ Add New Custom Role...</option>
+                </select>
+              ) : (
+                <div className="flex gap-1.5">
+                  <input
+                    type="text"
+                    placeholder="e.g. Distributor, Agent"
+                    value={customRoleText}
+                    onChange={(e) => setCustomRoleText(e.target.value)}
+                    className="flex h-9.5 w-full rounded-lg border border-blue-500 bg-white dark:bg-slate-900 px-3 py-1.5 text-xs text-slate-900 dark:text-slate-100 focus:outline-none"
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => {
+                      if (customRoleText.trim()) {
+                        addPartyRole(customRoleText.trim());
+                        setType(customRoleText.trim());
+                        setIsCustomRoleInput(false);
+                      }
+                    }}
+                    className="text-xs px-2.5"
+                  >
+                    Add
+                  </Button>
+                </div>
+              )}
             </div>
 
             <Input

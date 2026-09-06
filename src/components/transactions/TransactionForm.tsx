@@ -5,9 +5,9 @@ import { useRouter } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
-import { TransactionType } from '@/types/database';
-import { ArrowDownLeft, ArrowUpRight, ArrowLeftRight, AlertCircle, CheckCircle2, Paperclip } from 'lucide-react';
+import { Modal } from '@/components/ui/Modal';
+import { TransactionType, PartyType } from '@/types/database';
+import { ArrowDownLeft, ArrowUpRight, ArrowLeftRight, AlertCircle, CheckCircle2, Paperclip, Plus, UserPlus } from 'lucide-react';
 
 interface TransactionFormProps {
   type: TransactionType;
@@ -18,9 +18,12 @@ export function TransactionForm({ type }: TransactionFormProps) {
   const { 
     accounts, 
     parties, 
+    customPartyRoles,
+    addPartyRole,
     categories, 
     createTransaction, 
     getAccountBalance,
+    addParty,
     currentCompany 
   } = useApp();
 
@@ -36,6 +39,20 @@ export function TransactionForm({ type }: TransactionFormProps) {
   const [chequeDate, setChequeDate] = useState('');
   const [narration, setNarration] = useState('');
   const [attachmentName, setAttachmentName] = useState('');
+
+  // Quick Inline Add Party Modal State
+  const [isNewPartyOpen, setIsNewPartyOpen] = useState(false);
+  const [newPartyName, setNewPartyName] = useState('');
+  const [newPartyRole, setNewPartyRole] = useState<string>(
+    type.includes('receipt') ? 'Customer' : (type.includes('payment') ? 'Supplier / Vendor' : 'Customer')
+  );
+  const [isCustomRoleInput, setIsCustomRoleInput] = useState(false);
+  const [customRoleText, setCustomRoleText] = useState('');
+  const [newPartyOpeningBal, setNewPartyOpeningBal] = useState('0');
+  const [newPartyPhone, setNewPartyPhone] = useState('');
+  const [newPartyEmail, setNewPartyEmail] = useState('');
+  const [newPartyAddress, setNewPartyAddress] = useState('');
+  const [partyError, setPartyError] = useState<string | null>(null);
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -155,6 +172,38 @@ export function TransactionForm({ type }: TransactionFormProps) {
     }
   };
 
+  const handleCreateParty = (e: React.FormEvent) => {
+    e.preventDefault();
+    setPartyError(null);
+
+    if (!newPartyName.trim()) {
+      setPartyError('Party name is required.');
+      return;
+    }
+
+    const res = addParty({
+      name: newPartyName.trim(),
+      type: newPartyRole,
+      phone: newPartyPhone.trim() || undefined,
+      email: newPartyEmail.trim() || undefined,
+      address: newPartyAddress.trim() || undefined,
+      opening_balance: parseFloat(newPartyOpeningBal) || 0,
+      status: 'active',
+    });
+
+    if (res.success && res.party) {
+      setPartyId(res.party.id);
+      setIsNewPartyOpen(false);
+      setNewPartyName('');
+      setNewPartyPhone('');
+      setNewPartyEmail('');
+      setNewPartyAddress('');
+      setNewPartyOpeningBal('0');
+    } else {
+      setPartyError(res.error || 'Failed to create party');
+    }
+  };
+
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <div>
@@ -193,13 +242,18 @@ export function TransactionForm({ type }: TransactionFormProps) {
           <CardContent className="p-6 space-y-5">
             {/* Top Row: Date & Amount */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Input
-                label="Transaction Date"
-                type="date"
-                required
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-              />
+              <div className="space-y-1.5">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Transaction Date <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  className="flex h-9.5 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-600"
+                />
+              </div>
 
               <div className="space-y-1.5">
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
@@ -278,9 +332,28 @@ export function TransactionForm({ type }: TransactionFormProps) {
 
               {!isTransfer && (
                 <div className="space-y-1.5">
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                    Party (Customer / Vendor)
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                      Party (Customer / Vendor)
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPartyError(null);
+                        setNewPartyName('');
+                        setNewPartyRole(type.includes('receipt') ? 'customer' : 'supplier');
+                        setNewPartyPhone('');
+                        setNewPartyEmail('');
+                        setNewPartyAddress('');
+                        setNewPartyOpeningBal('0');
+                        setIsNewPartyOpen(true);
+                      }}
+                      className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 flex items-center gap-1 hover:underline cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>New Party</span>
+                    </button>
+                  </div>
                   <select
                     value={partyId}
                     onChange={(e) => setPartyId(e.target.value)}
@@ -289,7 +362,7 @@ export function TransactionForm({ type }: TransactionFormProps) {
                     <option value="">None / Walk-in / Direct</option>
                     {parties.map(p => (
                       <option key={p.id} value={p.id}>
-                        {p.name} ({p.type.toUpperCase()})
+                        {p.name} ({p.type === 'customer' ? 'Customer' : p.type === 'supplier' ? 'Supplier / Vendor' : 'Other'})
                       </option>
                     ))}
                   </select>
@@ -311,7 +384,12 @@ export function TransactionForm({ type }: TransactionFormProps) {
                   >
                     <option value="">Select Category</option>
                     {categories
-                      .filter(c => type.includes('receipt') ? c.type === 'income' : c.type === 'expense')
+                      .filter(c => {
+                        if (c.status !== 'active') return false;
+                        if (type.includes('receipt')) return c.type === 'income';
+                        if (type.includes('payment')) return c.type === 'expense';
+                        return true;
+                      })
                       .map(c => (
                         <option key={c.id} value={c.id}>
                           {c.name}
@@ -320,43 +398,70 @@ export function TransactionForm({ type }: TransactionFormProps) {
                   </select>
                 </div>
 
-                <Input
-                  label="Reference / Voucher Number"
-                  placeholder="e.g. INV-9018, REC-021"
-                  value={referenceNo}
-                  onChange={(e) => setReferenceNo(e.target.value)}
-                />
-              </div>
-            )}
-
-            {/* Bank Specific Fields (UTR, Cheque) */}
-            {isBankForm && (
-              <div className="p-4 bg-blue-50/50 dark:bg-blue-950/20 rounded-xl border border-blue-100 dark:border-blue-900/40 space-y-4">
-                <p className="text-xs font-semibold text-blue-900 dark:text-blue-300">Banking Audit & Clearing Identifiers</p>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <Input
-                    label="UTR / IMPS / Ref No."
-                    placeholder="e.g. HDFCR2026..."
-                    value={utrNo}
-                    onChange={(e) => setUtrNo(e.target.value)}
-                  />
-                  <Input
-                    label="Cheque Number"
-                    placeholder="e.g. 000492"
-                    value={chequeNo}
-                    onChange={(e) => setChequeNo(e.target.value)}
-                  />
-                  <Input
-                    label="Cheque Clearing Date"
-                    type="date"
-                    value={chequeDate}
-                    onChange={(e) => setChequeDate(e.target.value)}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    Reference / Voucher Number
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. INV-9018, REC-021"
+                    value={referenceNo}
+                    onChange={(e) => setReferenceNo(e.target.value)}
+                    className="flex h-9.5 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-blue-600"
                   />
                 </div>
               </div>
             )}
 
-            {/* Narration */}
+            {/* Bank Specific Details */}
+            {isBankForm && (
+              <div className="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-700 space-y-4">
+                <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 block">
+                  Banking Settlement References
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                      UTR / Transfer ID
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. HDFCR20260901..."
+                      value={utrNo}
+                      onChange={(e) => setUtrNo(e.target.value)}
+                      className="flex h-9.5 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-blue-600 font-mono"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                      Cheque / Instrument No.
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 000492"
+                      value={chequeNo}
+                      onChange={(e) => setChequeNo(e.target.value)}
+                      className="flex h-9.5 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-blue-600 font-mono"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                      Cheque Date
+                    </label>
+                    <input
+                      type="date"
+                      value={chequeDate}
+                      onChange={(e) => setChequeDate(e.target.value)}
+                      className="flex h-9.5 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-600"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Narration Description */}
             <div className="space-y-1.5">
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
                 Narration / Description
@@ -403,6 +508,179 @@ export function TransactionForm({ type }: TransactionFormProps) {
           </CardFooter>
         </Card>
       </form>
+
+      {/* Inline Quick Add Party Modal */}
+      <Modal
+        isOpen={isNewPartyOpen}
+        onClose={() => setIsNewPartyOpen(false)}
+        title="Add New Party"
+        description="Register a new customer, supplier or entity directly"
+        maxWidth="md"
+      >
+        <form onSubmit={handleCreateParty} className="space-y-4">
+          {partyError && (
+            <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-lg text-xs flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+              <span>{partyError}</span>
+            </div>
+          )}
+
+          <div className="space-y-1.5">
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+              Party Name <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              required
+              placeholder="e.g. Acme Corp Ltd"
+              value={newPartyName}
+              onChange={(e) => setNewPartyName(e.target.value)}
+              className="flex h-9.5 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-blue-600"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Party Role <span className="text-red-500">*</span>
+                </label>
+                {!isCustomRoleInput ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCustomRoleInput(true);
+                      setCustomRoleText('');
+                    }}
+                    className="text-[10px] text-blue-600 hover:text-blue-700 dark:text-blue-400 font-semibold flex items-center gap-0.5"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>New Role</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setIsCustomRoleInput(false)}
+                    className="text-[10px] text-slate-400 hover:text-slate-600 font-semibold"
+                  >
+                    Cancel
+                  </button>
+                )}
+              </div>
+
+              {!isCustomRoleInput ? (
+                <select
+                  value={newPartyRole}
+                  onChange={(e) => {
+                    if (e.target.value === '__add_new__') {
+                      setIsCustomRoleInput(true);
+                      setCustomRoleText('');
+                    } else {
+                      setNewPartyRole(e.target.value);
+                    }
+                  }}
+                  className="flex h-9.5 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-600 cursor-pointer"
+                >
+                  {customPartyRoles.map(r => (
+                    <option key={r} value={r}>
+                      {r}
+                    </option>
+                  ))}
+                  <option value="__add_new__">+ Add New Custom Role...</option>
+                </select>
+              ) : (
+                <div className="flex gap-1.5">
+                  <input
+                    type="text"
+                    placeholder="e.g. Agent, Partner, Distributor"
+                    value={customRoleText}
+                    onChange={(e) => setCustomRoleText(e.target.value)}
+                    className="flex h-9.5 w-full rounded-lg border border-blue-500 bg-white dark:bg-slate-900 px-3 py-1.5 text-xs text-slate-900 dark:text-slate-100 focus:outline-none"
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => {
+                      if (customRoleText.trim()) {
+                        addPartyRole(customRoleText.trim());
+                        setNewPartyRole(customRoleText.trim());
+                        setIsCustomRoleInput(false);
+                      }
+                    }}
+                    className="text-xs px-2.5"
+                  >
+                    Add
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                Opening Balance
+              </label>
+              <input
+                type="number"
+                min="0"
+                placeholder="0"
+                value={newPartyOpeningBal}
+                onChange={(e) => setNewPartyOpeningBal(e.target.value)}
+                className="flex h-9.5 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-blue-600"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                Phone Number
+              </label>
+              <input
+                type="text"
+                placeholder="+91 98765 43210"
+                value={newPartyPhone}
+                onChange={(e) => setNewPartyPhone(e.target.value)}
+                className="flex h-9.5 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-blue-600"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                Email Address
+              </label>
+              <input
+                type="email"
+                placeholder="contact@entity.com"
+                value={newPartyEmail}
+                onChange={(e) => setNewPartyEmail(e.target.value)}
+                className="flex h-9.5 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-blue-600"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+              Registered Address
+            </label>
+            <input
+              type="text"
+              placeholder="Street address, city, state"
+              value={newPartyAddress}
+              onChange={(e) => setNewPartyAddress(e.target.value)}
+              className="flex h-9.5 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-blue-600"
+            />
+          </div>
+
+          <div className="flex justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+            <Button type="button" variant="outline" size="sm" onClick={() => setIsNewPartyOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" size="sm">
+              Save Party
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

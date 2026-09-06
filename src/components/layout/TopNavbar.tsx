@@ -10,18 +10,20 @@ import {
   Bell, 
   ArrowDownLeft, 
   ArrowUpRight, 
-  ArrowLeftRight,
-  ShieldCheck,
-  Building,
-  User,
-  LogOut,
-  LogIn
+  ArrowLeftRight, 
+  ShieldCheck, 
+  Building, 
+  User, 
+  LogOut, 
+  LogIn,
+  Sun,
+  Moon
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 
 export function TopNavbar() {
   const pathname = usePathname();
-  const { searchQuery, setSearchQuery, currentCompany, currentUser, isAuthenticated, logout } = useApp();
+  const { searchQuery, setSearchQuery, currentCompany, currentUser, isAuthenticated, logout, theme, toggleTheme } = useApp();
   const [isUserMenuOpen, setIsUserMenuOpen] = React.useState(false);
 
   // Generate breadcrumbs from pathname
@@ -38,7 +40,7 @@ export function TopNavbar() {
       <div className="flex items-center gap-2 text-xs text-slate-500">
         <Link href="/" className="hover:text-blue-600 transition-colors font-medium flex items-center gap-1.5">
           <Building className="w-3.5 h-3.5" />
-          <span>{currentCompany.name}</span>
+          <span>{currentUser?.name || currentUser?.email || currentCompany.name}</span>
         </Link>
         {breadcrumbs.length > 0 && <span>/</span>}
         {breadcrumbs.map((b, idx) => (
@@ -92,8 +94,22 @@ export function TopNavbar() {
           </Button>
         </Link>
 
+        {/* Theme Toggle (Dark / Light) */}
+        <button
+          type="button"
+          onClick={toggleTheme}
+          title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+          className="p-2 rounded-lg text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+        >
+          {theme === 'dark' ? (
+            <Sun className="w-4 h-4 text-amber-400" />
+          ) : (
+            <Moon className="w-4 h-4 text-slate-600" />
+          )}
+        </button>
+
         {/* User Session Profile & Logout */}
-        <div className="relative ml-2 pl-2 border-l border-slate-200 dark:border-slate-700">
+        <div className="relative ml-1 pl-2 border-l border-slate-200 dark:border-slate-700">
           {isAuthenticated && currentUser ? (
             <div className="relative">
               <button

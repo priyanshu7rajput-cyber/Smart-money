@@ -77,7 +77,7 @@ export function Sidebar() {
   ];
 
   return (
-    <aside className="w-64 bg-slate-900 text-slate-300 flex flex-col h-screen fixed top-0 left-0 z-40 border-r border-slate-800 select-none">
+    <aside className="w-64 bg-slate-900 dark:bg-slate-950 text-slate-300 flex flex-col h-screen fixed top-0 left-0 z-40 border-r border-slate-800 select-none">
       {/* Brand Header */}
       <div className="px-5 py-4.5 border-b border-slate-800 flex items-center gap-3">
         <div className="w-9 h-9 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-lg shadow-md shadow-blue-500/20">
@@ -89,27 +89,35 @@ export function Sidebar() {
         </div>
       </div>
 
-      {/* Multi-Company Dropdown */}
+      {/* Multi-Company / User Entity */}
       <div className="px-4 py-3 border-b border-slate-800/80 bg-slate-950/40">
         <label className="text-[10px] font-semibold tracking-wider uppercase text-slate-400 block mb-1.5">
-          Active Entity
+          Active Account / Entity
         </label>
         <div className="relative">
-          <select
-            value={currentCompany.id}
-            onChange={(e) => setCompany(e.target.value)}
-            className="w-full bg-slate-800/90 text-xs text-slate-200 border border-slate-700/80 rounded-md py-2 px-2.5 pr-8 appearance-none focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium cursor-pointer"
-          >
-            {companies.map(c => (
-              <option key={c.id} value={c.id} className="bg-slate-900 text-white">
-                {c.name}
-              </option>
-            ))}
-          </select>
-          <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          {companies.some(c => c.id === currentCompany.id) ? (
+            <select
+              value={currentCompany.id}
+              onChange={(e) => setCompany(e.target.value)}
+              className="w-full bg-slate-800/90 text-xs text-slate-200 border border-slate-700/80 rounded-md py-2 px-2.5 pr-8 appearance-none focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium cursor-pointer"
+            >
+              {companies.map(c => (
+                <option key={c.id} value={c.id} className="bg-slate-900 text-white">
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <div className="w-full bg-slate-800/90 text-xs text-slate-200 border border-slate-700/80 rounded-md py-2 px-2.5 font-medium truncate">
+              {currentCompany.name}
+            </div>
+          )}
+          {companies.some(c => c.id === currentCompany.id) && (
+            <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          )}
         </div>
         <div className="mt-1 flex items-center justify-between text-[11px] text-slate-400 px-0.5">
-          <span>{currentCompany.tax_id || 'GST Registered'}</span>
+          <span>{currentCompany.tax_id || (currentUser?.email ? 'Personal Vault' : 'GST Registered')}</span>
           <span className="text-emerald-400 font-mono text-[10px]">Active</span>
         </div>
       </div>

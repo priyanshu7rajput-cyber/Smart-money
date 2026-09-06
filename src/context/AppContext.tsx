@@ -41,8 +41,15 @@ interface AppContextType {
   deleteAccount: (id: string) => { success: boolean; error?: string };
 
   // Party operations
-  addParty: (party: Omit<Party, 'id' | 'created_at' | 'updated_at' | 'company_id'>) => { success: boolean; error?: string };
+  parties: Party[];
+  customPartyRoles: string[];
+  addPartyRole: (role: string) => void;
+  addParty: (party: Omit<Party, 'id' | 'created_at' | 'updated_at' | 'company_id'>) => { success: boolean; party?: Party; error?: string };
   updateParty: (id: string, updates: Partial<Party>) => { success: boolean; error?: string };
+
+  // Theme support
+  theme: 'light' | 'dark';
+  toggleTheme: () => void;
 
   // Category operations
   addCategory: (category: Omit<Category, 'id' | 'created_at' | 'updated_at' | 'company_id'>) => { success: boolean; error?: string };
@@ -115,12 +122,41 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [parties, setParties] = useState<Party[]>([]);
+  const [customPartyRoles, setCustomPartyRoles] = useState<string[]>(['Customer', 'Supplier / Vendor', 'Other Entity']);
+  const [theme, setTheme] = useState<'light' | 'dark'>('dark');
   const [categories, setCategories] = useState<Category[]>(INITIAL_CATEGORIES);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [isHydrated, setIsHydrated] = useState(false);
 
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+
+  const toggleTheme = () => {
+    const nextTheme = theme === 'dark' ? 'light' : 'dark';
+    setTheme(nextTheme);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('smartmoney_theme', nextTheme);
+      if (nextTheme === 'dark') {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    }
+  };
+
+  const addPartyRole = (role: string) => {
+    const trimmed = role.trim();
+    if (!trimmed) return;
+    setCustomPartyRoles(prev => {
+      if (prev.some(r => r.toLowerCase() === trimmed.toLowerCase())) return prev;
+      const updated = [...prev, trimmed];
+      if (typeof window !== 'undefined' && currentUser) {
+        const storagePrefix = currentUser.id === 'usr-admin-01' ? 'cashflow_demo_' : `cashflow_${currentUser.id}_`;
+        localStorage.setItem(`${storagePrefix}party_roles`, JSON.stringify(updated));
+      }
+      return updated;
+    });
+  };
 
   const loadUserDataForProfile = (user: UserProfile) => {
     setCurrentUser(user);
@@ -129,6 +165,31 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('cashflow_user', JSON.stringify(user));
     const isDemoAdmin = user.id === 'usr-admin-01' || user.email?.toLowerCase() === 'admin@apex.corp';
     const storagePrefix = isDemoAdmin ? 'cashflow_demo_' : `cashflow_${user.id}_`;
+
+    const savedRoles = localStorage.getItem(`${storagePrefix}party_roles`);
+    if (savedRoles) {
+      setCustomPartyRoles(JSON.parse(savedRoles));
+    } else {
+      setCustomPartyRoles(['Customer', 'Supplier / Vendor', 'Other Entity']);
+    }
+
+    // Initialize or load user company entity
+    if (!isDemoAdmin) {
+      const userCompanyName = user.name ? `${user.name}'s Account` : (user.email ? `${user.email.split('@')[0]}'s Treasury` : 'My Financial Entity');
+      const userCompany: Company = {
+        id: `comp-${user.id}`,
+        name: userCompanyName,
+        tax_id: 'Primary Account',
+        currency: 'INR',
+        currency_symbol: '₹',
+        financial_year_start: '2026-04-01',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      setCurrentCompany(userCompany);
+    } else {
+      setCurrentCompany(DEMO_COMPANY);
+    }
 
     const savedAccounts = localStorage.getItem(`${storagePrefix}accounts`);
     if (savedAccounts !== null) {
@@ -169,6 +230,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Hydrate from localStorage client-side once mounted to prevent SSR hydration mismatch
   useEffect(() => {
     try {
+      const savedTheme = localStorage.getItem('smartmoney_theme') as 'light' | 'dark' | null;
+      if (savedTheme) {
+        setTheme(savedTheme);
+        if (savedTheme === 'dark') {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
+      } else {
+        // Default to dark theme
+        document.documentElement.classList.add('dark');
+      }
+
       const savedUserStr = localStorage.getItem('cashflow_user');
       if (savedUserStr) {
         const user: UserProfile = JSON.parse(savedUserStr);
@@ -484,7 +558,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       updated_at: new Date().toISOString(),
     };
     setParties(prev => [newParty, ...prev]);
-    return { success: true };
+    return { success: true, party: newParty };
   };
 
   const updateParty = (id: string, updates: Partial<Party>) => {
@@ -934,6 +1008,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         companies,
         accounts: accounts.filter(a => a.company_id === currentCompany.id).length > 0 ? accounts.filter(a => a.company_id === currentCompany.id) : accounts,
         parties: parties.filter(p => p.company_id === currentCompany.id).length > 0 ? parties.filter(p => p.company_id === currentCompany.id) : parties,
+        customPartyRoles,
+        addPartyRole,
+        theme,
+        toggleTheme,
         categories: categories.filter(c => c.company_id === currentCompany.id).length > 0 ? categories.filter(c => c.company_id === currentCompany.id) : categories,
         transactions: transactions.filter(t => t.company_id === currentCompany.id).length > 0 ? transactions.filter(t => t.company_id === currentCompany.id) : transactions,
         auditLogs: auditLogs.filter(l => l.company_id === currentCompany.id).length > 0 ? auditLogs.filter(l => l.company_id === currentCompany.id) : auditLogs,
