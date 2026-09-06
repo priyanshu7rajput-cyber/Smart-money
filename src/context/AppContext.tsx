@@ -127,41 +127,42 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (typeof window === 'undefined') return;
 
     localStorage.setItem('cashflow_user', JSON.stringify(user));
-    const storagePrefix = user.id === 'usr-admin-01' ? 'cashflow_demo_' : `cashflow_${user.id}_`;
+    const isDemoAdmin = user.id === 'usr-admin-01' || user.email?.toLowerCase() === 'admin@apex.corp';
+    const storagePrefix = isDemoAdmin ? 'cashflow_demo_' : `cashflow_${user.id}_`;
 
     const savedAccounts = localStorage.getItem(`${storagePrefix}accounts`);
-    if (savedAccounts && JSON.parse(savedAccounts).length > 0) {
+    if (savedAccounts !== null) {
       setAccounts(JSON.parse(savedAccounts));
     } else {
-      setAccounts(INITIAL_ACCOUNTS);
+      setAccounts(isDemoAdmin ? INITIAL_ACCOUNTS : []);
     }
 
     const savedParties = localStorage.getItem(`${storagePrefix}parties`);
-    if (savedParties && JSON.parse(savedParties).length > 0) {
+    if (savedParties !== null) {
       setParties(JSON.parse(savedParties));
     } else {
-      setParties(INITIAL_PARTIES);
+      setParties(isDemoAdmin ? INITIAL_PARTIES : []);
     }
 
     const savedCategories = localStorage.getItem(`${storagePrefix}categories`);
-    if (savedCategories) {
+    if (savedCategories !== null) {
       setCategories(JSON.parse(savedCategories));
     } else {
       setCategories(INITIAL_CATEGORIES);
     }
 
     const savedTransactions = localStorage.getItem(`${storagePrefix}transactions`);
-    if (savedTransactions) {
+    if (savedTransactions !== null) {
       setTransactions(JSON.parse(savedTransactions));
     } else {
-      setTransactions(INITIAL_TRANSACTIONS);
+      setTransactions(isDemoAdmin ? INITIAL_TRANSACTIONS : []);
     }
 
     const savedLogs = localStorage.getItem(`${storagePrefix}audit_logs`);
-    if (savedLogs) {
+    if (savedLogs !== null) {
       setAuditLogs(JSON.parse(savedLogs));
     } else {
-      setAuditLogs(INITIAL_AUDIT_LOGS);
+      setAuditLogs(isDemoAdmin ? INITIAL_AUDIT_LOGS : []);
     }
   };
 
@@ -184,11 +185,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (e) {
       console.error('Failed to load local storage state', e);
-      setAccounts(INITIAL_ACCOUNTS);
-      setParties(INITIAL_PARTIES);
+      setAccounts([]);
+      setParties([]);
       setCategories(INITIAL_CATEGORIES);
-      setTransactions(INITIAL_TRANSACTIONS);
-      setAuditLogs(INITIAL_AUDIT_LOGS);
+      setTransactions([]);
+      setAuditLogs([]);
     } finally {
       setIsHydrated(true);
     }

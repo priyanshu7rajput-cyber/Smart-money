@@ -51,13 +51,16 @@ export function SegmentedDonutChart() {
           color: SEGMENT_COLORS[idx % SEGMENT_COLORS.length],
         };
       })
-    : [
-        { name: 'HDFC Corporate Bank', value: 1040000, percentage: 56.5, type: 'bank', color: '#e11d48' },
-        { name: 'ICICI Treasury Bank', value: 370000, percentage: 20.1, type: 'bank', color: '#fed7aa' },
-        { name: 'SBI Overdraft Bank', value: 150000, percentage: 8.2, type: 'bank', color: '#fce7f3' },
-        { name: 'Main Cash Register', value: 185000, percentage: 10.1, type: 'cash', color: '#ede9fe' },
-        { name: 'Petty Cash Box', value: 95000, percentage: 5.2, type: 'cash', color: '#e0e7ff' },
-      ];
+    : [];
+
+  if (chartData.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center p-8 text-center bg-slate-50/50 dark:bg-slate-900/40 rounded-xl border border-dashed border-slate-200 dark:border-slate-800">
+        <span className="text-xs font-semibold text-slate-400">No active capital or accounts with positive balance</span>
+        <p className="text-[11px] text-slate-500 mt-1">Create cash or bank accounts to see live liquidity distribution.</p>
+      </div>
+    );
+  }
 
   const currentActive = chartData[activeIndex] || chartData[0];
 

@@ -293,64 +293,73 @@ export function DashboardView() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {recentTransactions.map((tx) => {
-                  const amt = tx.entries?.reduce((max, e) => Math.max(max, e.debit || 0), 0) || 0;
-                  const firstEntryAccId = tx.entries?.[0]?.account_id;
-                  const account = accounts.find(a => a.id === firstEntryAccId);
+                {recentTransactions.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="px-4 py-8 text-center text-slate-400">
+                      <p className="font-semibold text-xs text-slate-500">No transactions recorded yet</p>
+                      <p className="text-[11px] text-slate-400 mt-1">Start by adding a Cash Receipt, Bank Receipt or Payment.</p>
+                    </td>
+                  </tr>
+                ) : (
+                  recentTransactions.map((tx) => {
+                    const amt = tx.entries?.reduce((max, e) => Math.max(max, e.debit || 0), 0) || 0;
+                    const firstEntryAccId = tx.entries?.[0]?.account_id;
+                    const account = accounts.find(a => a.id === firstEntryAccId);
 
-                  const typeColors: Record<string, string> = {
-                    cash_receipt: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-                    bank_receipt: 'bg-teal-50 text-teal-700 border-teal-200',
-                    cash_payment: 'bg-rose-50 text-rose-700 border-rose-200',
-                    bank_payment: 'bg-amber-50 text-amber-700 border-amber-200',
-                    transfer: 'bg-blue-50 text-blue-700 border-blue-200',
-                  };
+                    const typeColors: Record<string, string> = {
+                      cash_receipt: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                      bank_receipt: 'bg-teal-50 text-teal-700 border-teal-200',
+                      cash_payment: 'bg-rose-50 text-rose-700 border-rose-200',
+                      bank_payment: 'bg-amber-50 text-amber-700 border-amber-200',
+                      transfer: 'bg-blue-50 text-blue-700 border-blue-200',
+                    };
 
-                  return (
-                    <tr key={tx.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
-                      <td className="px-4 py-3 font-semibold font-mono text-blue-600 dark:text-blue-400">
-                        {tx.transaction_no}
-                      </td>
-                      <td className="px-4 py-3 text-slate-600 dark:text-slate-400">
-                        {formatDate(tx.transaction_date)}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-semibold border ${typeColors[tx.transaction_type] || 'bg-slate-100'}`}>
-                          {tx.transaction_type.replace('_', ' ').toUpperCase()}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-200">
-                        {account?.name || '-'}
-                      </td>
-                      <td className="px-4 py-3 text-slate-500 font-mono text-[11px]">
-                        {tx.reference_no || tx.utr_no || tx.cheque_no || '-'}
-                      </td>
-                      <td className="px-4 py-3 text-right font-bold text-slate-900 dark:text-slate-100 font-mono">
-                        {formatCurrency(amt, currentCompany.currency, currentCompany.currency_symbol)}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        {tx.status === 'active' ? (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600">
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            Active
+                    return (
+                      <tr key={tx.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
+                        <td className="px-4 py-3 font-semibold font-mono text-blue-600 dark:text-blue-400">
+                          {tx.transaction_no}
+                        </td>
+                        <td className="px-4 py-3 text-slate-600 dark:text-slate-400">
+                          {formatDate(tx.transaction_date)}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-semibold border ${typeColors[tx.transaction_type] || 'bg-slate-100'}`}>
+                            {tx.transaction_type.replace('_', ' ').toUpperCase()}
                           </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-400 line-through">
-                            <Ban className="w-3.5 h-3.5 text-rose-500" />
-                            Voided
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <Link href={`/transactions?id=${tx.id}`}>
-                          <button className="text-blue-600 hover:text-blue-800 dark:text-blue-400 p-1 rounded hover:bg-blue-50 dark:hover:bg-blue-900/30">
-                            <Eye className="w-4 h-4" />
-                          </button>
-                        </Link>
-                      </td>
-                    </tr>
-                  );
-                })}
+                        </td>
+                        <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-200">
+                          {account?.name || '-'}
+                        </td>
+                        <td className="px-4 py-3 text-slate-500 font-mono text-[11px]">
+                          {tx.reference_no || tx.utr_no || tx.cheque_no || '-'}
+                        </td>
+                        <td className="px-4 py-3 text-right font-bold text-slate-900 dark:text-slate-100 font-mono">
+                          {formatCurrency(amt, currentCompany.currency, currentCompany.currency_symbol)}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          {tx.status === 'active' ? (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600">
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              Active
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-400 line-through">
+                              <Ban className="w-3.5 h-3.5 text-rose-500" />
+                              Voided
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <Link href={`/transactions?id=${tx.id}`}>
+                            <button className="text-blue-600 hover:text-blue-800 dark:text-blue-400 p-1 rounded hover:bg-blue-50 dark:hover:bg-blue-900/30">
+                              <Eye className="w-4 h-4" />
+                            </button>
+                          </Link>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
           </div>
