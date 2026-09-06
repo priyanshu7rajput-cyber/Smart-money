@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { formatCurrency, maskAccountNumber } from '@/lib/utils';
-import { Wallet, Landmark, Plus, Search, CheckCircle2, AlertCircle, ShieldAlert, PowerOff } from 'lucide-react';
+import { Wallet, Landmark, Plus, Search, CheckCircle2, AlertCircle, Edit3, Trash2, PowerOff } from 'lucide-react';
 import { Account, AccountType, BalanceType } from '@/types/database';
 
 interface AccountsViewProps {
@@ -22,9 +22,9 @@ export function AccountsView({ initialType = 'all' }: AccountsViewProps) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  // Form state
+  // Create Form state
   const [formName, setFormName] = useState('');
-  const [formType, setFormType] = useState<AccountType>('cash');
+  const [formType, setFormType] = useState<AccountType>(initialType === 'bank' ? 'bank' : 'cash');
   const [formBankName, setFormBankName] = useState('');
   const [formAccountNumber, setFormAccountNumber] = useState('');
   const [formIfsc, setFormIfsc] = useState('');
@@ -32,6 +32,19 @@ export function AccountsView({ initialType = 'all' }: AccountsViewProps) {
   const [formOpeningBalance, setFormOpeningBalance] = useState<string>('0');
   const [formOpeningBalanceType, setFormOpeningBalanceType] = useState<BalanceType>('debit');
   const [formDescription, setFormDescription] = useState('');
+
+  // Edit Account state
+  const [editingAccount, setEditingAccount] = useState<Account | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editType, setEditType] = useState<AccountType>('cash');
+  const [editBankName, setEditBankName] = useState('');
+  const [editAccountNumber, setEditAccountNumber] = useState('');
+  const [editIfsc, setEditIfsc] = useState('');
+  const [editBranch, setEditBranch] = useState('');
+  const [editOpeningBalance, setEditOpeningBalance] = useState('0');
+  const [editOpeningBalanceType, setEditOpeningBalanceType] = useState<BalanceType>('debit');
+  const [editDescription, setEditDescription] = useState('');
+  const [editStatus, setEditStatus] = useState<'active' | 'inactive'>('active');
 
   const filteredAccounts = accounts.filter(acc => {
     if (filterType !== 'all' && acc.type !== filterType) return false;
@@ -96,11 +109,69 @@ export function AccountsView({ initialType = 'all' }: AccountsViewProps) {
     }
   };
 
+  const handleOpenEdit = (acc: Account) => {
+    setEditingAccount(acc);
+    setEditName(acc.name);
+    setEditType(acc.type);
+    setEditBankName(acc.bank_name || '');
+    setEditAccountNumber(acc.account_number || '');
+    setEditIfsc(acc.ifsc || '');
+    setEditBranch(acc.branch || '');
+    setEditOpeningBalance(String(acc.opening_balance || 0));
+    setEditOpeningBalanceType(acc.opening_balance_type || 'debit');
+    setEditDescription(acc.description || '');
+    setEditStatus(acc.status);
+    setErrorMessage(null);
+  };
+
+  const handleUpdate = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingAccount) return;
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    if (!editName.trim()) {
+      setErrorMessage('Account name is required.');
+      return;
+    }
+
+    if (editType === 'bank' && !editBankName.trim()) {
+      setErrorMessage('Bank Name is required for Bank accounts.');
+      return;
+    }
+
+    const parsedBal = parseFloat(editOpeningBalance);
+    if (isNaN(parsedBal) || parsedBal < 0) {
+      setErrorMessage('Please enter a valid opening balance (>= 0).');
+      return;
+    }
+
+    const res = updateAccount(editingAccount.id, {
+      name: editName.trim(),
+      type: editType,
+      bank_name: editType === 'bank' ? editBankName.trim() : undefined,
+      account_number: editType === 'bank' ? editAccountNumber.trim() : undefined,
+      ifsc: editType === 'bank' ? editIfsc.trim().toUpperCase() : undefined,
+      branch: editType === 'bank' ? editBranch.trim() : undefined,
+      opening_balance: parsedBal,
+      opening_balance_type: editOpeningBalanceType,
+      description: editDescription.trim(),
+      status: editStatus,
+    });
+
+    if (res.success) {
+      setSuccessMessage(`Account "${editName}" updated successfully.`);
+      setEditingAccount(null);
+    } else {
+      setErrorMessage(res.error || 'Failed to update account.');
+    }
+  };
+
   const handleDelete = (id: string, name: string) => {
     setErrorMessage(null);
     setSuccessMessage(null);
 
-    const confirm = window.confirm(`Are you sure you want to delete or deactivate "${name}"?`);
+    const confirm = window.confirm(`Are you sure you want to delete "${name}"?`);
     if (!confirm) return;
 
     const res = deleteAccount(id);
@@ -120,13 +191,13 @@ export function AccountsView({ initialType = 'all' }: AccountsViewProps) {
     <div className="space-y-6">
       {/* Notifications */}
       {errorMessage && (
-        <div className="p-3.5 bg-rose-50 border border-rose-200 text-rose-800 rounded-lg text-xs flex items-center gap-2">
+        <div className="p-3.5 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-xs flex items-center gap-2">
           <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
           <span>{errorMessage}</span>
         </div>
       )}
       {successMessage && (
-        <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg text-xs flex items-center gap-2">
+        <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
           <span>{successMessage}</span>
         </div>
@@ -135,48 +206,49 @@ export function AccountsView({ initialType = 'all' }: AccountsViewProps) {
       {/* Header & Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
-            Account Management
+          <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            {filterType === 'cash' ? <Wallet className="w-5 h-5 text-emerald-500" /> : filterType === 'bank' ? <Landmark className="w-5 h-5 text-blue-500" /> : <Landmark className="w-5 h-5 text-blue-500" />}
+            {filterType === 'cash' ? 'Cash Accounts & Registers' : filterType === 'bank' ? 'Bank Accounts & Ledgers' : 'Master Account Management'}
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Configure Cash Registers and Institutional Bank Accounts
+            Configure, edit, and monitor Cash Safes and Corporate Bank Accounts
           </p>
         </div>
-        <Button onClick={() => setIsCreateOpen(true)} className="gap-1.5 text-xs">
+        <Button onClick={() => setIsCreateOpen(true)} className="gap-1.5 text-xs shadow-sm">
           <Plus className="w-4 h-4" />
           Add New Account
         </Button>
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="flex flex-col sm:flex-row gap-3 items-center justify-between bg-white dark:bg-slate-900 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col sm:flex-row gap-3 items-center justify-between bg-white dark:bg-slate-900 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           <button
             onClick={() => setFilterType('all')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
               filterType === 'all'
-                ? 'bg-blue-600 text-white'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
             }`}
           >
             All ({accounts.length})
           </button>
           <button
             onClick={() => setFilterType('cash')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
               filterType === 'cash'
-                ? 'bg-emerald-600 text-white'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
             }`}
           >
             Cash ({accounts.filter(a => a.type === 'cash').length})
           </button>
           <button
             onClick={() => setFilterType('bank')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
               filterType === 'bank'
-                ? 'bg-blue-600 text-white'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
             }`}
           >
             Bank ({accounts.filter(a => a.type === 'bank').length})
@@ -190,7 +262,7 @@ export function AccountsView({ initialType = 'all' }: AccountsViewProps) {
             placeholder="Search accounts..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg pl-9 pr-3 py-1.5 text-xs text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-blue-500"
+            className="w-full bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-lg pl-9 pr-3 py-1.5 text-xs text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
           />
         </div>
       </div>
@@ -202,22 +274,22 @@ export function AccountsView({ initialType = 'all' }: AccountsViewProps) {
           const isCash = acc.type === 'cash';
 
           return (
-            <Card key={acc.id} className="relative flex flex-col justify-between hover:shadow-md transition-shadow">
-              <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
+            <Card key={acc.id} className="relative flex flex-col justify-between hover:shadow-md transition-all duration-200 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+              <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-800/80">
                 <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div className={`p-2 rounded-lg ${isCash ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40' : 'bg-blue-50 text-blue-600 dark:bg-blue-950/40'}`}>
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className={`p-2 rounded-xl shrink-0 ${isCash ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50' : 'bg-blue-50 text-blue-600 dark:bg-blue-950/50'}`}>
                       {isCash ? <Wallet className="w-5 h-5" /> : <Landmark className="w-5 h-5" />}
                     </div>
-                    <div>
-                      <h4 className="font-semibold text-sm text-slate-900 dark:text-slate-100">{acc.name}</h4>
-                      <p className="text-[11px] text-slate-500 capitalize">{isCash ? 'Cash Vault' : acc.bank_name || 'Bank Account'}</p>
+                    <div className="min-w-0 flex-1">
+                      <h4 className="font-semibold text-sm text-slate-900 dark:text-slate-100 truncate" title={acc.name}>{acc.name}</h4>
+                      <p className="text-[11px] text-slate-500 capitalize truncate">{isCash ? 'Cash Vault / Counter' : acc.bank_name || 'Bank Account'}</p>
                     </div>
                   </div>
-                  <span className={`px-2 py-0.5 rounded text-[10px] font-semibold border ${
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-semibold border shrink-0 ${
                     acc.status === 'active' 
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
-                      : 'bg-slate-100 text-slate-500 border-slate-200'
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800' 
+                      : 'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400'
                   }`}>
                     {acc.status.toUpperCase()}
                   </span>
@@ -226,7 +298,7 @@ export function AccountsView({ initialType = 'all' }: AccountsViewProps) {
 
               <CardContent className="py-4 space-y-3">
                 {acc.type === 'bank' && (
-                  <div className="bg-slate-50 dark:bg-slate-800/40 p-2.5 rounded-lg space-y-1 text-xs">
+                  <div className="bg-slate-50 dark:bg-slate-800/40 p-2.5 rounded-lg space-y-1 text-xs border border-slate-100 dark:border-slate-800/60">
                     <div className="flex justify-between">
                       <span className="text-slate-500">A/C Number:</span>
                       <span className="font-mono font-medium text-slate-700 dark:text-slate-300">
@@ -242,7 +314,7 @@ export function AccountsView({ initialType = 'all' }: AccountsViewProps) {
                     {acc.branch && (
                       <div className="flex justify-between">
                         <span className="text-slate-500">Branch:</span>
-                        <span className="text-slate-700 dark:text-slate-300">{acc.branch}</span>
+                        <span className="text-slate-700 dark:text-slate-300 truncate max-w-[150px]">{acc.branch}</span>
                       </div>
                     )}
                   </div>
@@ -251,7 +323,7 @@ export function AccountsView({ initialType = 'all' }: AccountsViewProps) {
                 <div className="flex items-end justify-between pt-1">
                   <div>
                     <span className="text-[10px] uppercase font-semibold text-slate-400 block">Calculated Balance</span>
-                    <span className="text-lg font-bold font-mono text-slate-900 dark:text-slate-100">
+                    <span className={`text-lg font-bold font-mono ${liveBalance >= 0 ? 'text-slate-900 dark:text-slate-100' : 'text-rose-600 dark:text-rose-400'}`}>
                       {formatCurrency(liveBalance, currentCompany.currency, currentCompany.currency_symbol)}
                     </span>
                   </div>
@@ -264,26 +336,33 @@ export function AccountsView({ initialType = 'all' }: AccountsViewProps) {
                 </div>
               </CardContent>
 
-              <div className="px-4 py-2.5 bg-slate-50 dark:bg-slate-800/60 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
-                <span className="text-slate-500 text-[11px] truncate max-w-[150px]">
+              <div className="px-4 py-2.5 bg-slate-50/70 dark:bg-slate-800/40 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-xs">
+                <span className="text-slate-500 text-[11px] truncate max-w-[130px]" title={acc.description}>
                   {acc.description || 'No description'}
                 </span>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
+                  <button 
+                    onClick={() => handleOpenEdit(acc)}
+                    className="p-1 text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors"
+                    title="Edit Account Details"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                  </button>
                   {acc.status === 'active' && (
                     <button 
                       onClick={() => handleDeactivate(acc.id)}
-                      className="text-amber-600 hover:text-amber-700 font-medium text-[11px]"
+                      className="p-1 text-slate-500 hover:text-amber-600 dark:text-slate-400 dark:hover:text-amber-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors"
                       title="Deactivate account"
                     >
-                      Deactivate
+                      <PowerOff className="w-3.5 h-3.5" />
                     </button>
                   )}
                   <button 
                     onClick={() => handleDelete(acc.id, acc.name)}
-                    className="text-rose-600 hover:text-rose-700 font-medium text-[11px]"
+                    className="p-1 text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors"
                     title="Delete account"
                   >
-                    Delete
+                    <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>
@@ -324,7 +403,7 @@ export function AccountsView({ initialType = 'all' }: AccountsViewProps) {
               <select
                 value={formType}
                 onChange={(e) => setFormType(e.target.value as AccountType)}
-                className="flex h-9.5 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-600"
+                className="flex h-9.5 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-600 cursor-pointer"
               >
                 <option value="cash">Cash Account</option>
                 <option value="bank">Bank Account</option>
@@ -383,7 +462,7 @@ export function AccountsView({ initialType = 'all' }: AccountsViewProps) {
               <select
                 value={formOpeningBalanceType}
                 onChange={(e) => setFormOpeningBalanceType(e.target.value as BalanceType)}
-                className="flex h-9.5 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-600"
+                className="flex h-9.5 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-600 cursor-pointer"
               >
                 <option value="debit">Debit (Asset / Positive)</option>
                 <option value="credit">Credit (Liability / Overdraft)</option>
@@ -407,6 +486,117 @@ export function AccountsView({ initialType = 'all' }: AccountsViewProps) {
             </Button>
           </div>
         </form>
+      </Modal>
+
+      {/* Edit Account Modal */}
+      <Modal
+        isOpen={Boolean(editingAccount)}
+        onClose={() => setEditingAccount(null)}
+        title="Edit Account"
+        description="Modify cash vault or bank account configuration"
+        maxWidth="lg"
+      >
+        {editingAccount && (
+          <form onSubmit={handleUpdate} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <Input
+                label="Account Display Name"
+                required
+                placeholder="e.g. Main Cash Vault / Axis Bank"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+              />
+              <div className="space-y-1.5">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Account Type <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={editType}
+                  onChange={(e) => setEditType(e.target.value as AccountType)}
+                  className="flex h-9.5 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-600 cursor-pointer"
+                >
+                  <option value="cash">Cash Account</option>
+                  <option value="bank">Bank Account</option>
+                </select>
+              </div>
+            </div>
+
+            {editType === 'bank' && (
+              <div className="space-y-4 p-3.5 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700">
+                <div className="grid grid-cols-2 gap-4">
+                  <Input
+                    label="Bank Name"
+                    required
+                    placeholder="e.g. HDFC Bank, State Bank of India"
+                    value={editBankName}
+                    onChange={(e) => setEditBankName(e.target.value)}
+                  />
+                  <Input
+                    label="Bank Account Number"
+                    placeholder="e.g. 50200012345678"
+                    value={editAccountNumber}
+                    onChange={(e) => setEditAccountNumber(e.target.value)}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <Input
+                    label="IFSC Code"
+                    placeholder="e.g. HDFC0001234"
+                    value={editIfsc}
+                    onChange={(e) => setEditIfsc(e.target.value)}
+                  />
+                  <Input
+                    label="Branch Office"
+                    placeholder="e.g. Nariman Point, Mumbai"
+                    value={editBranch}
+                    onChange={(e) => setEditBranch(e.target.value)}
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-4">
+              <Input
+                label="Opening Balance"
+                type="number"
+                step="any"
+                min="0"
+                required
+                value={editOpeningBalance}
+                onChange={(e) => setEditOpeningBalance(e.target.value)}
+              />
+              <div className="space-y-1.5">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Status
+                </label>
+                <select
+                  value={editStatus}
+                  onChange={(e) => setEditStatus(e.target.value as 'active' | 'inactive')}
+                  className="flex h-9.5 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-600 cursor-pointer"
+                >
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
+            </div>
+
+            <Input
+              label="Description / Purpose"
+              placeholder="e.g. For daily operations and client remittances"
+              value={editDescription}
+              onChange={(e) => setEditDescription(e.target.value)}
+            />
+
+            <div className="flex justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <Button type="button" variant="outline" size="sm" onClick={() => setEditingAccount(null)}>
+                Cancel
+              </Button>
+              <Button type="submit" size="sm" variant="primary">
+                Update Account
+              </Button>
+            </div>
+          </form>
+        )}
       </Modal>
     </div>
   );

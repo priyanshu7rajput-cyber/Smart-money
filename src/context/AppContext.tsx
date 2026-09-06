@@ -43,8 +43,11 @@ interface AppContextType {
   // Party operations
   customPartyRoles: string[];
   addPartyRole: (role: string) => void;
+  updatePartyRole: (oldRole: string, newRole: string) => void;
+  deletePartyRole: (role: string) => void;
   addParty: (party: Omit<Party, 'id' | 'created_at' | 'updated_at' | 'company_id'>) => { success: boolean; party?: Party; error?: string };
   updateParty: (id: string, updates: Partial<Party>) => { success: boolean; error?: string };
+  deleteParty: (id: string) => { success: boolean; error?: string };
 
   // Theme support
   theme: 'light' | 'dark';
@@ -52,6 +55,8 @@ interface AppContextType {
 
   // Category operations
   addCategory: (category: Omit<Category, 'id' | 'created_at' | 'updated_at' | 'company_id'>) => { success: boolean; error?: string };
+  updateCategory: (id: string, updates: Partial<Category>) => { success: boolean; error?: string };
+  deleteCategory: (id: string) => { success: boolean; error?: string };
 
   // Transaction operations (Double-entry engine)
   createTransaction: (data: {
@@ -149,6 +154,38 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setCustomPartyRoles(prev => {
       if (prev.some(r => r.toLowerCase() === trimmed.toLowerCase())) return prev;
       const updated = [...prev, trimmed];
+      if (typeof window !== 'undefined' && currentUser) {
+        const storagePrefix = currentUser.id === 'usr-admin-01' ? 'cashflow_demo_' : `cashflow_${currentUser.id}_`;
+        localStorage.setItem(`${storagePrefix}party_roles`, JSON.stringify(updated));
+      }
+      return updated;
+    });
+  };
+
+  const updatePartyRole = (oldRole: string, newRole: string) => {
+    const trimmedNew = newRole.trim();
+    if (!trimmedNew || !oldRole) return;
+    setCustomPartyRoles(prev => {
+      const updated = prev.map(r => r === oldRole ? trimmedNew : r);
+      if (typeof window !== 'undefined' && currentUser) {
+        const storagePrefix = currentUser.id === 'usr-admin-01' ? 'cashflow_demo_' : `cashflow_${currentUser.id}_`;
+        localStorage.setItem(`${storagePrefix}party_roles`, JSON.stringify(updated));
+      }
+      return updated;
+    });
+
+    // Also update any parties using this oldRole
+    setParties(prev => prev.map(p => {
+      if (p.type.toLowerCase() === oldRole.toLowerCase()) {
+        return { ...p, type: trimmedNew, updated_at: new Date().toISOString() };
+      }
+      return p;
+    }));
+  };
+
+  const deletePartyRole = (role: string) => {
+    setCustomPartyRoles(prev => {
+      const updated = prev.filter(r => r !== role);
       if (typeof window !== 'undefined' && currentUser) {
         const storagePrefix = currentUser.id === 'usr-admin-01' ? 'cashflow_demo_' : `cashflow_${currentUser.id}_`;
         localStorage.setItem(`${storagePrefix}party_roles`, JSON.stringify(updated));
@@ -565,6 +602,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return { success: true };
   };
 
+  const deleteParty = (id: string) => {
+    const hasTransactions = transactions.some(tx => 
+      tx.company_id === currentCompany.id && 
+      tx.entries?.some(e => e.party_id === id)
+    );
+
+    if (hasTransactions) {
+      return { 
+        success: false, 
+        error: 'This party cannot be deleted because transactions are linked to it. You can edit its details or deactivate instead.' 
+      };
+    }
+
+    setParties(prev => prev.filter(p => p.id !== id));
+    return { success: true };
+  };
+
   // Category operations
   const addCategory = (catData: Omit<Category, 'id' | 'created_at' | 'updated_at' | 'company_id'>) => {
     const exists = categories.some(c => 
@@ -584,6 +638,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       updated_at: new Date().toISOString(),
     };
     setCategories(prev => [newCat, ...prev]);
+    return { success: true };
+  };
+
+  const updateCategory = (id: string, updates: Partial<Category>) => {
+    setCategories(prev => prev.map(c => c.id === id ? { ...c, ...updates, updated_at: new Date().toISOString() } : c));
+    return { success: true };
+  };
+
+  const deleteCategory = (id: string) => {
+    const hasTransactions = transactions.some(tx =>
+      tx.company_id === currentCompany.id &&
+      tx.entries?.some(e => e.category_id === id)
+    );
+
+    if (hasTransactions) {
+      return {
+        success: false,
+        error: 'This category cannot be deleted because transactions are linked to it. You can edit its details instead.'
+      };
+    }
+
+    setCategories(prev => prev.filter(c => c.id !== id));
     return { success: true };
   };
 
@@ -1009,6 +1085,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         parties: parties.filter(p => p.company_id === currentCompany.id).length > 0 ? parties.filter(p => p.company_id === currentCompany.id) : parties,
         customPartyRoles,
         addPartyRole,
+        updatePartyRole,
+        deletePartyRole,
         theme,
         toggleTheme,
         categories: categories.filter(c => c.company_id === currentCompany.id).length > 0 ? categories.filter(c => c.company_id === currentCompany.id) : categories,
@@ -1023,7 +1101,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         deleteAccount,
         addParty,
         updateParty,
+        deleteParty,
         addCategory,
+        updateCategory,
+        deleteCategory,
         createTransaction,
         voidTransaction,
         deleteTransaction,

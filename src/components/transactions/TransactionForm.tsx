@@ -360,11 +360,18 @@ export function TransactionForm({ type }: TransactionFormProps) {
                     className="flex h-9.5 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-600"
                   >
                     <option value="">None / Walk-in / Direct</option>
-                    {parties.map(p => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} ({p.type === 'customer' ? 'Customer' : p.type === 'supplier' ? 'Supplier / Vendor' : 'Other'})
-                      </option>
-                    ))}
+                    {parties.map(p => {
+                      const displayRole = p.type.toLowerCase() === 'customer' 
+                        ? 'Customer' 
+                        : p.type.toLowerCase() === 'supplier' 
+                        ? 'Supplier / Vendor' 
+                        : p.type;
+                      return (
+                        <option key={p.id} value={p.id}>
+                          {p.name} ({displayRole})
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
               )}
