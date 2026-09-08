@@ -116,22 +116,22 @@ export function TreasuryRedistributionFlowChart() {
   const activeFlow = flows.find(f => f.id === activeFlowId) || flows[1];
 
   return (
-    <div className="relative overflow-hidden rounded-3xl bg-[#121316] border border-slate-800/90 text-white shadow-2xl p-6 md:p-8">
+    <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-[#121316] border border-slate-800/90 text-white shadow-2xl p-4 sm:p-6 md:p-8">
       {/* Header bar matching the user mockup */}
-      <div className="flex items-center justify-between border-b border-white/[0.08] pb-4 mb-6">
-        <div className="flex items-center gap-2">
-          <button className="text-slate-400 hover:text-white p-1 rounded-md">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.08] pb-4 mb-4 sm:mb-6">
+        <div className="flex items-center gap-2 min-w-0">
+          <button className="text-slate-400 hover:text-white p-1 rounded-md shrink-0">
             <Layers className="w-5 h-5" />
           </button>
-          <div className="flex items-baseline gap-2">
-            <h3 className="text-lg font-bold text-white tracking-tight">
+          <div className="flex items-baseline gap-1.5 sm:gap-2 truncate">
+            <h3 className="text-base sm:text-lg font-bold text-white tracking-tight truncate">
               Redistribution by program
             </h3>
-            <span className="text-slate-400 text-sm font-semibold">/ {currentCompany.currency_symbol}M</span>
+            <span className="text-slate-400 text-xs sm:text-sm font-semibold shrink-0">/ {currentCompany.currency_symbol}M</span>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 text-slate-400">
+        <div className="flex items-center gap-1.5 text-slate-400">
           <button className="p-1.5 hover:text-white hover:bg-white/5 rounded-lg transition-colors">
             <ArrowLeftRight className="w-4 h-4" />
           </button>
@@ -144,7 +144,7 @@ export function TreasuryRedistributionFlowChart() {
         </div>
       </div>
 
-      <p className="text-xs text-slate-400 -mt-3 mb-6">
+      <p className="text-xs text-slate-400 -mt-2 sm:-mt-3 mb-5 sm:mb-6">
         Strategic grant-making and fund redistribution approach ensuring capital reaches active programs
       </p>
 

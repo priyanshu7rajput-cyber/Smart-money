@@ -116,6 +116,11 @@ interface AppContextType {
   login: (email: string, password?: string) => Promise<{ success: boolean; error?: string }>;
   signUp: (email: string, password?: string, fullName?: string) => Promise<{ success: boolean; error?: string; message?: string }>;
   logout: () => Promise<void>;
+
+  // Mobile navigation
+  isMobileSidebarOpen: boolean;
+  setIsMobileSidebarOpen: (open: boolean) => void;
+  toggleMobileSidebar: () => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -123,6 +128,7 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [currentCompany, setCurrentCompany] = useState<Company>(DEMO_COMPANY);
   const [companies] = useState<Company[]>(DEMO_COMPANIES);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [parties, setParties] = useState<Party[]>([]);
@@ -134,6 +140,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [isHydrated, setIsHydrated] = useState(false);
 
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+
+  const toggleMobileSidebar = () => {
+    setIsMobileSidebarOpen(prev => !prev);
+  };
 
   const toggleTheme = () => {
     const nextTheme = theme === 'dark' ? 'light' : 'dark';
@@ -1120,6 +1130,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         login,
         signUp,
         logout,
+        isMobileSidebarOpen,
+        setIsMobileSidebarOpen,
+        toggleMobileSidebar,
       }}
     >
       {children}

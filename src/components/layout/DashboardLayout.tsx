@@ -31,9 +31,9 @@ function ProtectedContent({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen bg-slate-50 dark:bg-slate-950 font-sans">
       <Sidebar />
-      <div className="flex-1 flex flex-col pl-64 min-w-0">
+      <div className="flex-1 flex flex-col lg:pl-64 min-w-0 transition-all duration-300">
         <TopNavbar />
-        <main className="flex-1 p-6 max-w-7xl w-full mx-auto">
+        <main className="flex-1 p-3 sm:p-5 md:p-6 max-w-7xl w-full mx-auto">
           {children}
         </main>
       </div>

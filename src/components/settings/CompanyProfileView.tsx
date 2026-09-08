@@ -54,7 +54,7 @@ export function CompanyProfileView() {
               onChange={(e) => setName(e.target.value)}
             />
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input
                 label="Tax Identification / GSTIN"
                 value={taxId}
@@ -69,7 +69,7 @@ export function CompanyProfileView() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input
                 label="Currency Code"
                 value={currency}

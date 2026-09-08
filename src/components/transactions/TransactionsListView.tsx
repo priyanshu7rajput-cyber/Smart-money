@@ -327,10 +327,11 @@ export function TransactionsListView() {
         </CardContent>
       </Card>
 
-      {/* Transactions Table */}
+      {/* Transactions Table & Mobile Cards */}
       <Card>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
+          {/* Desktop Table View */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-50 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-800">
                 <tr>
@@ -346,92 +347,213 @@ export function TransactionsListView() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {paginatedTransactions.map(tx => {
-                  const amt = tx.entries?.reduce((max, e) => Math.max(max, e.debit || 0), 0) || 0;
-                  const firstAcc = accounts.find(a => a.id === tx.entries?.[0]?.account_id);
-                  const isVoided = tx.status === 'voided';
+                {paginatedTransactions.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="px-4 py-10 text-center text-slate-400">
+                      No matching transactions found.
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedTransactions.map(tx => {
+                    const amt = tx.entries?.reduce((max, e) => Math.max(max, e.debit || 0), 0) || 0;
+                    const firstAcc = accounts.find(a => a.id === tx.entries?.[0]?.account_id);
+                    const isVoided = tx.status === 'voided';
 
-                  const badgeStyle: Record<string, string> = {
-                    cash_receipt: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-                    bank_receipt: 'bg-teal-50 text-teal-700 border-teal-200',
-                    cash_payment: 'bg-rose-50 text-rose-700 border-rose-200',
-                    bank_payment: 'bg-amber-50 text-amber-700 border-amber-200',
-                    transfer: 'bg-blue-50 text-blue-700 border-blue-200',
-                  };
+                    const badgeStyle: Record<string, string> = {
+                      cash_receipt: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                      bank_receipt: 'bg-teal-50 text-teal-700 border-teal-200',
+                      cash_payment: 'bg-rose-50 text-rose-700 border-rose-200',
+                      bank_payment: 'bg-amber-50 text-amber-700 border-amber-200',
+                      transfer: 'bg-blue-50 text-blue-700 border-blue-200',
+                    };
 
-                  return (
-                    <tr 
-                      key={tx.id} 
-                      className={`hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors ${
-                        isVoided ? 'opacity-60 bg-slate-50/40 dark:bg-slate-900/40' : ''
-                      }`}
-                    >
-                      <td className="px-4 py-3 font-mono font-semibold text-blue-600 dark:text-blue-400">
-                        {tx.transaction_no}
-                      </td>
-                      <td className="px-4 py-3 text-slate-600 dark:text-slate-400 whitespace-nowrap">
-                        {formatDate(tx.transaction_date)}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-semibold border ${badgeStyle[tx.transaction_type] || 'bg-slate-100'}`}>
-                          {tx.transaction_type.replace('_', ' ').toUpperCase()}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-200">
-                        {firstAcc?.name || '-'}
-                      </td>
-                      <td className="px-4 py-3 text-slate-500 font-mono text-[11px]">
-                        {tx.reference_no || tx.utr_no || tx.cheque_no || '-'}
-                      </td>
-                      <td className="px-4 py-3 text-slate-600 dark:text-slate-400 max-w-[200px] truncate">
-                        {tx.narration || '-'}
-                      </td>
-                      <td className="px-4 py-3 text-right font-bold text-slate-900 dark:text-slate-100 font-mono">
-                        {formatCurrency(amt, currentCompany.currency, currentCompany.currency_symbol)}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        {!isVoided ? (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600">
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            Active
+                    return (
+                      <tr 
+                        key={tx.id} 
+                        className={`hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors ${
+                          isVoided ? 'opacity-60 bg-slate-50/40 dark:bg-slate-900/40' : ''
+                        }`}
+                      >
+                        <td className="px-4 py-3 font-mono font-semibold text-blue-600 dark:text-blue-400">
+                          {tx.transaction_no}
+                        </td>
+                        <td className="px-4 py-3 text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                          {formatDate(tx.transaction_date)}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-semibold border ${badgeStyle[tx.transaction_type] || 'bg-slate-100'}`}>
+                            {tx.transaction_type.replace('_', ' ').toUpperCase()}
                           </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-500 line-through">
-                            <Ban className="w-3.5 h-3.5" />
-                            Voided
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-right whitespace-nowrap space-x-1">
-                        <button
-                          onClick={() => openDetail(tx)}
-                          className="p-1 text-blue-600 hover:text-blue-800 dark:text-blue-400 rounded hover:bg-blue-50 dark:hover:bg-blue-900/30"
-                          title="View Ledger Breakdown"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        {!isVoided && (
+                        </td>
+                        <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-200">
+                          {firstAcc?.name || '-'}
+                        </td>
+                        <td className="px-4 py-3 text-slate-500 font-mono text-[11px]">
+                          {tx.reference_no || tx.utr_no || tx.cheque_no || '-'}
+                        </td>
+                        <td className="px-4 py-3 text-slate-600 dark:text-slate-400 max-w-[200px] truncate">
+                          {tx.narration || '-'}
+                        </td>
+                        <td className="px-4 py-3 text-right font-bold text-slate-900 dark:text-slate-100 font-mono">
+                          {formatCurrency(amt, currentCompany.currency, currentCompany.currency_symbol)}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          {!isVoided ? (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600">
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              Active
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-500 line-through">
+                              <Ban className="w-3.5 h-3.5" />
+                              Voided
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-right whitespace-nowrap space-x-1">
                           <button
-                            onClick={() => openVoidDialog(tx)}
-                            className="p-1 text-amber-500 hover:text-amber-700 rounded hover:bg-amber-50 dark:hover:bg-amber-900/30"
-                            title="Void Financial Transaction"
+                            onClick={() => openDetail(tx)}
+                            className="p-1 text-blue-600 hover:text-blue-800 dark:text-blue-400 rounded hover:bg-blue-50 dark:hover:bg-blue-900/30 cursor-pointer"
+                            title="View Ledger Breakdown"
                           >
-                            <Ban className="w-4 h-4" />
+                            <Eye className="w-4 h-4" />
                           </button>
-                        )}
-                        <button
-                          onClick={() => openDeleteDialog(tx)}
-                          className="p-1 text-rose-500 hover:text-rose-700 rounded hover:bg-rose-50 dark:hover:bg-rose-900/30"
-                          title="Delete Transaction"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
+                          {!isVoided && (
+                            <button
+                              onClick={() => openVoidDialog(tx)}
+                              className="p-1 text-amber-500 hover:text-amber-700 rounded hover:bg-amber-50 dark:hover:bg-amber-900/30 cursor-pointer"
+                              title="Void Financial Transaction"
+                            >
+                              <Ban className="w-4 h-4" />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => openDeleteDialog(tx)}
+                            className="p-1 text-rose-500 hover:text-rose-700 rounded hover:bg-rose-50 dark:hover:bg-rose-900/30 cursor-pointer"
+                            title="Delete Transaction"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile Card List View (< md screens) */}
+          <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+            {paginatedTransactions.length === 0 ? (
+              <div className="p-8 text-center text-slate-400 text-xs">
+                No matching transactions found.
+              </div>
+            ) : (
+              paginatedTransactions.map(tx => {
+                const amt = tx.entries?.reduce((max, e) => Math.max(max, e.debit || 0), 0) || 0;
+                const firstAcc = accounts.find(a => a.id === tx.entries?.[0]?.account_id);
+                const isVoided = tx.status === 'voided';
+
+                const badgeStyle: Record<string, string> = {
+                  cash_receipt: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                  bank_receipt: 'bg-teal-50 text-teal-700 border-teal-200',
+                  cash_payment: 'bg-rose-50 text-rose-700 border-rose-200',
+                  bank_payment: 'bg-amber-50 text-amber-700 border-amber-200',
+                  transfer: 'bg-blue-50 text-blue-700 border-blue-200',
+                };
+
+                return (
+                  <div 
+                    key={tx.id} 
+                    className={`p-4 space-y-2.5 transition-colors ${
+                      isVoided ? 'opacity-60 bg-slate-50/40 dark:bg-slate-900/40' : 'hover:bg-slate-50/60 dark:hover:bg-slate-800/40'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-bold text-xs text-blue-600 dark:text-blue-400">
+                            {tx.transaction_no}
+                          </span>
+                          <span className={`inline-block px-1.5 py-0.2 rounded text-[9px] font-bold border ${badgeStyle[tx.transaction_type] || 'bg-slate-100'}`}>
+                            {tx.transaction_type.replace('_', ' ').toUpperCase()}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-400 mt-0.5">{formatDate(tx.transaction_date)}</p>
+                      </div>
+
+                      <div className="text-right">
+                        <span className="font-mono font-extrabold text-sm text-slate-900 dark:text-slate-100">
+                          {formatCurrency(amt, currentCompany.currency, currentCompany.currency_symbol)}
+                        </span>
+                        <div>
+                          {!isVoided ? (
+                            <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-emerald-600">
+                              <CheckCircle2 className="w-3 h-3" /> Active
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-rose-500 line-through">
+                              <Ban className="w-3 h-3" /> Voided
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="text-xs bg-slate-50 dark:bg-slate-800/60 p-2.5 rounded-lg space-y-1">
+                      <div className="flex justify-between text-slate-600 dark:text-slate-400">
+                        <span className="text-[11px] text-slate-400">Account:</span>
+                        <span className="font-medium text-slate-800 dark:text-slate-200">{firstAcc?.name || '-'}</span>
+                      </div>
+                      {(tx.reference_no || tx.utr_no || tx.cheque_no) && (
+                        <div className="flex justify-between text-slate-600 dark:text-slate-400">
+                          <span className="text-[11px] text-slate-400">Ref / UTR:</span>
+                          <span className="font-mono text-[11px]">{tx.reference_no || tx.utr_no || tx.cheque_no}</span>
+                        </div>
+                      )}
+                      {tx.narration && (
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 italic pt-0.5">
+                          &ldquo;{tx.narration}&rdquo;
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-end gap-1 pt-1">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => openDetail(tx)}
+                        className="text-xs py-1 px-2.5 gap-1 text-blue-600 dark:text-blue-400"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        <span>Details</span>
+                      </Button>
+                      {!isVoided && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => openVoidDialog(tx)}
+                          className="text-xs py-1 px-2.5 gap-1 text-amber-600 hover:text-amber-700"
+                        >
+                          <Ban className="w-3.5 h-3.5" />
+                          <span>Void</span>
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => openDeleteDialog(tx)}
+                        className="text-xs py-1 px-2.5 gap-1 text-rose-600 hover:text-rose-700"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Delete</span>
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
 
           {/* Pagination Controls */}
