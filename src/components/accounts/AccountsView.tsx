@@ -193,25 +193,25 @@ export function AccountsView({ initialType = 'all' }: AccountsViewProps) {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Notifications */}
       {errorMessage && (
-        <div className="p-3.5 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-xs flex items-center gap-2">
+        <div className="p-3 sm:p-3.5 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-xs flex items-center gap-2">
           <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
-          <span>{errorMessage}</span>
+          <span className="flex-1">{errorMessage}</span>
         </div>
       )}
       {successMessage && (
-        <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs flex items-center gap-2">
+        <div className="p-3 sm:p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
-          <span>{successMessage}</span>
+          <span className="flex-1">{successMessage}</span>
         </div>
       )}
 
       {/* Header & Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
         <div>
-          <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
+          <h2 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
             {filterType === 'cash' ? <Wallet className="w-5 h-5 text-emerald-500" /> : filterType === 'bank' ? <Landmark className="w-5 h-5 text-blue-500" /> : <Landmark className="w-5 h-5 text-blue-500" />}
             {filterType === 'cash' ? 'Cash Accounts & Registers' : filterType === 'bank' ? 'Bank Accounts & Ledgers' : 'Master Account Management'}
           </h2>
@@ -219,18 +219,18 @@ export function AccountsView({ initialType = 'all' }: AccountsViewProps) {
             Configure, edit, and monitor Cash Safes and Corporate Bank Accounts
           </p>
         </div>
-        <Button onClick={() => setIsCreateOpen(true)} className="gap-1.5 text-xs shadow-sm">
+        <Button onClick={() => setIsCreateOpen(true)} className="w-full sm:w-auto justify-center gap-1.5 text-xs shadow-sm py-2">
           <Plus className="w-4 h-4" />
           Add New Account
         </Button>
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="flex flex-col sm:flex-row gap-3 items-center justify-between bg-white dark:bg-slate-900 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
-        <div className="flex items-center gap-2 w-full sm:w-auto">
+      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between bg-white dark:bg-slate-900 p-3 sm:p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+        <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 sm:pb-0 no-scrollbar">
           <button
             onClick={() => setFilterType('all')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap shrink-0 transition-all ${
               filterType === 'all'
                 ? 'bg-blue-600 text-white shadow-xs'
                 : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
@@ -240,7 +240,7 @@ export function AccountsView({ initialType = 'all' }: AccountsViewProps) {
           </button>
           <button
             onClick={() => setFilterType('cash')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap shrink-0 transition-all ${
               filterType === 'cash'
                 ? 'bg-emerald-600 text-white shadow-xs'
                 : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
@@ -250,7 +250,7 @@ export function AccountsView({ initialType = 'all' }: AccountsViewProps) {
           </button>
           <button
             onClick={() => setFilterType('bank')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap shrink-0 transition-all ${
               filterType === 'bank'
                 ? 'bg-blue-600 text-white shadow-xs'
                 : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
@@ -273,25 +273,25 @@ export function AccountsView({ initialType = 'all' }: AccountsViewProps) {
       </div>
 
       {/* Account Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
         {filteredAccounts.map((acc) => {
           const liveBalance = getAccountBalance(acc.id);
           const isCash = acc.type === 'cash';
 
           return (
-            <Card key={acc.id} className="relative flex flex-col justify-between hover:shadow-md transition-all duration-200 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
-              <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-800/80">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-2.5 min-w-0">
+            <Card key={acc.id} className="relative flex flex-col justify-between hover:shadow-md transition-all duration-200 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden">
+              <CardHeader className="p-3 sm:p-4 pb-2.5 sm:pb-3 border-b border-slate-100 dark:border-slate-800/80">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
                     <div className={`p-2 rounded-xl shrink-0 ${isCash ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50' : 'bg-blue-50 text-blue-600 dark:bg-blue-950/50'}`}>
-                      {isCash ? <Wallet className="w-5 h-5" /> : <Landmark className="w-5 h-5" />}
+                      {isCash ? <Wallet className="w-4 h-4 sm:w-5 sm:h-5" /> : <Landmark className="w-4 h-4 sm:w-5 sm:h-5" />}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <h4 className="font-semibold text-sm text-slate-900 dark:text-slate-100 truncate" title={acc.name}>{acc.name}</h4>
-                      <p className="text-[11px] text-slate-500 capitalize truncate">{isCash ? 'Cash Vault / Counter' : acc.bank_name || 'Bank Account'}</p>
+                      <h4 className="font-semibold text-xs sm:text-sm text-slate-900 dark:text-slate-100 truncate" title={acc.name}>{acc.name}</h4>
+                      <p className="text-[10px] sm:text-[11px] text-slate-500 capitalize truncate">{isCash ? 'Cash Vault / Counter' : acc.bank_name || 'Bank Account'}</p>
                     </div>
                   </div>
-                  <span className={`px-2 py-0.5 rounded text-[10px] font-semibold border shrink-0 ${
+                  <span className={`px-1.5 sm:px-2 py-0.5 rounded text-[9px] sm:text-[10px] font-semibold border shrink-0 ${
                     acc.status === 'active' 
                       ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800' 
                       : 'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400'
@@ -301,85 +301,85 @@ export function AccountsView({ initialType = 'all' }: AccountsViewProps) {
                 </div>
               </CardHeader>
 
-              <CardContent className="py-4 space-y-3">
+              <CardContent className="p-3 sm:p-4 py-3 sm:py-4 space-y-2.5 sm:space-y-3">
                 {acc.type === 'bank' && (
-                  <div className="bg-slate-50 dark:bg-slate-800/40 p-2.5 rounded-lg space-y-1 text-xs border border-slate-100 dark:border-slate-800/60">
-                    <div className="flex justify-between">
+                  <div className="bg-slate-50 dark:bg-slate-800/40 p-2 sm:p-2.5 rounded-lg space-y-1 text-xs border border-slate-100 dark:border-slate-800/60">
+                    <div className="flex justify-between items-center text-[11px] sm:text-xs">
                       <span className="text-slate-500">A/C Number:</span>
                       <span className="font-mono font-medium text-slate-700 dark:text-slate-300">
                         {maskAccountNumber(acc.account_number)}
                       </span>
                     </div>
                     {acc.ifsc && (
-                      <div className="flex justify-between">
+                      <div className="flex justify-between items-center text-[11px] sm:text-xs">
                         <span className="text-slate-500">IFSC Code:</span>
                         <span className="font-mono text-slate-700 dark:text-slate-300">{acc.ifsc}</span>
                       </div>
                     )}
                     {acc.branch && (
-                      <div className="flex justify-between">
+                      <div className="flex justify-between items-center text-[11px] sm:text-xs">
                         <span className="text-slate-500">Branch:</span>
-                        <span className="text-slate-700 dark:text-slate-300 truncate max-w-[150px]">{acc.branch}</span>
+                        <span className="text-slate-700 dark:text-slate-300 truncate max-w-[120px] sm:max-w-[150px]">{acc.branch}</span>
                       </div>
                     )}
                   </div>
                 )}
 
-                <div className="flex items-end justify-between pt-1">
+                <div className="flex items-end justify-between pt-0.5 sm:pt-1">
                   <div>
-                    <span className="text-[10px] uppercase font-semibold text-slate-400 block">Calculated Balance</span>
-                    <span className={`text-lg font-bold font-mono ${liveBalance >= 0 ? 'text-slate-900 dark:text-slate-100' : 'text-rose-600 dark:text-rose-400'}`}>
+                    <span className="text-[9px] sm:text-[10px] uppercase font-semibold text-slate-400 block tracking-wider">Calculated Balance</span>
+                    <span className={`text-base sm:text-lg font-bold font-mono ${liveBalance >= 0 ? 'text-slate-900 dark:text-slate-100' : 'text-rose-600 dark:text-rose-400'}`}>
                       {formatCurrency(liveBalance, currentCompany.currency, currentCompany.currency_symbol)}
                     </span>
                   </div>
                   <div className="text-right">
-                    <span className="text-[10px] text-slate-400 block">Opening Balance</span>
-                    <span className="text-xs text-slate-600 dark:text-slate-400 font-mono">
+                    <span className="text-[9px] sm:text-[10px] text-slate-400 block">Opening Balance</span>
+                    <span className="text-[11px] sm:text-xs text-slate-600 dark:text-slate-400 font-mono">
                       {formatCurrency(acc.opening_balance, currentCompany.currency, currentCompany.currency_symbol)}
                     </span>
                   </div>
                 </div>
               </CardContent>
 
-              <div className="px-4 py-2.5 bg-slate-50/70 dark:bg-slate-800/40 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-xs">
-                <span className="text-slate-500 text-[11px] truncate max-w-[110px]" title={acc.description}>
+              <div className="px-3 sm:px-4 py-2 sm:py-2.5 bg-slate-50/80 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between gap-1.5 text-xs">
+                <span className="text-slate-500 text-[10px] sm:text-[11px] truncate flex-1 min-w-0" title={acc.description}>
                   {acc.description || 'No description'}
                 </span>
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1 shrink-0">
                   <button 
                     onClick={() => {
                       setSelectedHistoryAccount(acc);
                       setFromDate('');
                       setToDate('');
                     }}
-                    className="flex items-center gap-1 px-2 py-1 text-slate-700 dark:text-slate-200 hover:text-blue-600 dark:hover:text-blue-400 bg-white dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-950/50 border border-slate-200 dark:border-slate-700 rounded-md font-medium text-[11px] shadow-2xs transition-all cursor-pointer"
+                    className="flex items-center gap-1 px-1.5 sm:px-2 py-1 text-slate-700 dark:text-slate-200 hover:text-blue-600 dark:hover:text-blue-400 bg-white dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-950/50 border border-slate-200 dark:border-slate-700 rounded-md font-semibold text-[10px] sm:text-[11px] shadow-2xs transition-all cursor-pointer"
                     title="View Account History & Running Ledger"
                   >
-                    <History className="w-3.5 h-3.5 text-blue-500" />
+                    <History className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-blue-500" />
                     <span>History</span>
                   </button>
                   <button 
                     onClick={() => handleOpenEdit(acc)}
-                    className="p-1 text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors"
+                    className="p-1 sm:p-1.5 text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-400 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-md transition-colors cursor-pointer"
                     title="Edit Account Details"
                   >
-                    <Edit3 className="w-3.5 h-3.5" />
+                    <Edit3 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                   </button>
                   {acc.status === 'active' && (
                     <button 
                       onClick={() => handleDeactivate(acc.id)}
-                      className="p-1 text-slate-500 hover:text-amber-600 dark:text-slate-400 dark:hover:text-amber-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors"
+                      className="p-1 sm:p-1.5 text-slate-500 hover:text-amber-600 dark:text-slate-400 dark:hover:text-amber-400 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-md transition-colors cursor-pointer"
                       title="Deactivate account"
                     >
-                      <PowerOff className="w-3.5 h-3.5" />
+                      <PowerOff className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                     </button>
                   )}
                   <button 
                     onClick={() => handleDelete(acc.id, acc.name)}
-                    className="p-1 text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors"
+                    className="p-1 sm:p-1.5 text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-md transition-colors cursor-pointer"
                     title="Delete account"
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
+                    <Trash2 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                   </button>
                 </div>
               </div>
@@ -400,7 +400,7 @@ export function AccountsView({ initialType = 'all' }: AccountsViewProps) {
       <Modal
         isOpen={Boolean(selectedHistoryAccount)}
         onClose={() => setSelectedHistoryAccount(null)}
-        title={selectedHistoryAccount ? `${selectedHistoryAccount.name} — Statement & History` : 'Account History'}
+        title={selectedHistoryAccount ? `${selectedHistoryAccount.name} — Statement` : 'Account History'}
         description={selectedHistoryAccount ? `${selectedHistoryAccount.type === 'bank' ? selectedHistoryAccount.bank_name || 'Bank Account' : 'Cash Account'} • ${selectedHistoryAccount.account_number ? maskAccountNumber(selectedHistoryAccount.account_number) : 'Active Vault'}` : ''}
         maxWidth="2xl"
       >
@@ -409,76 +409,76 @@ export function AccountsView({ initialType = 'all' }: AccountsViewProps) {
           const liveBal = getAccountBalance(selectedHistoryAccount.id);
 
           return (
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               {/* Account Quick Stats Header */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-200/80 dark:border-slate-700/80">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Opening Balance</span>
-                  <span className="text-sm font-mono font-bold text-slate-700 dark:text-slate-200 mt-0.5 block">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+                <div className="bg-slate-50 dark:bg-slate-800/60 p-2 sm:p-3 rounded-xl border border-slate-200/80 dark:border-slate-700/80">
+                  <span className="text-[9px] sm:text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Opening</span>
+                  <span className="text-xs sm:text-sm font-mono font-bold text-slate-700 dark:text-slate-200 mt-0.5 block truncate">
                     {formatCurrency(ledger.openingBalance, currentCompany.currency, currentCompany.currency_symbol)}
                   </span>
                 </div>
-                <div className="bg-emerald-50/70 dark:bg-emerald-950/30 p-3 rounded-xl border border-emerald-200/60 dark:border-emerald-800/50">
-                  <span className="text-[10px] uppercase font-bold text-emerald-600 dark:text-emerald-400 block tracking-wider flex items-center gap-1">
-                    <ArrowDownLeft className="w-3 h-3" /> Total Inflow (Debit)
+                <div className="bg-emerald-50/70 dark:bg-emerald-950/30 p-2 sm:p-3 rounded-xl border border-emerald-200/60 dark:border-emerald-800/50">
+                  <span className="text-[9px] sm:text-[10px] uppercase font-bold text-emerald-600 dark:text-emerald-400 block tracking-wider flex items-center gap-0.5 truncate">
+                    <ArrowDownLeft className="w-3 h-3 shrink-0" /> Inflow (+)
                   </span>
-                  <span className="text-sm font-mono font-bold text-emerald-700 dark:text-emerald-300 mt-0.5 block">
+                  <span className="text-xs sm:text-sm font-mono font-bold text-emerald-700 dark:text-emerald-300 mt-0.5 block truncate">
                     {formatCurrency(ledger.totalDebit, currentCompany.currency, currentCompany.currency_symbol)}
                   </span>
                 </div>
-                <div className="bg-rose-50/70 dark:bg-rose-950/30 p-3 rounded-xl border border-rose-200/60 dark:border-rose-800/50">
-                  <span className="text-[10px] uppercase font-bold text-rose-600 dark:text-rose-400 block tracking-wider flex items-center gap-1">
-                    <ArrowUpRight className="w-3 h-3" /> Total Outflow (Credit)
+                <div className="bg-rose-50/70 dark:bg-rose-950/30 p-2 sm:p-3 rounded-xl border border-rose-200/60 dark:border-rose-800/50">
+                  <span className="text-[9px] sm:text-[10px] uppercase font-bold text-rose-600 dark:text-rose-400 block tracking-wider flex items-center gap-0.5 truncate">
+                    <ArrowUpRight className="w-3 h-3 shrink-0" /> Outflow (-)
                   </span>
-                  <span className="text-sm font-mono font-bold text-rose-700 dark:text-rose-300 mt-0.5 block">
+                  <span className="text-xs sm:text-sm font-mono font-bold text-rose-700 dark:text-rose-300 mt-0.5 block truncate">
                     {formatCurrency(ledger.totalCredit, currentCompany.currency, currentCompany.currency_symbol)}
                   </span>
                 </div>
-                <div className="bg-blue-50/70 dark:bg-blue-950/30 p-3 rounded-xl border border-blue-200/60 dark:border-blue-800/50">
-                  <span className="text-[10px] uppercase font-bold text-blue-600 dark:text-blue-400 block tracking-wider">Current Balance</span>
-                  <span className={`text-base font-mono font-bold mt-0.5 block ${liveBal >= 0 ? 'text-blue-700 dark:text-blue-300' : 'text-rose-600'}`}>
+                <div className="bg-blue-50/70 dark:bg-blue-950/30 p-2 sm:p-3 rounded-xl border border-blue-200/60 dark:border-blue-800/50">
+                  <span className="text-[9px] sm:text-[10px] uppercase font-bold text-blue-600 dark:text-blue-400 block tracking-wider">Current</span>
+                  <span className={`text-xs sm:text-sm font-mono font-bold mt-0.5 block truncate ${liveBal >= 0 ? 'text-blue-700 dark:text-blue-300' : 'text-rose-600'}`}>
                     {formatCurrency(liveBal, currentCompany.currency, currentCompany.currency_symbol)}
                   </span>
                 </div>
               </div>
 
               {/* Date Filters */}
-              <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-50 dark:bg-slate-800/40 p-3 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
-                <div className="flex items-center gap-3">
-                  <span className="font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                    <Calendar className="w-3.5 h-3.5 text-slate-500" /> Filter Period:
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-slate-50 dark:bg-slate-800/40 p-2.5 sm:p-3 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1 shrink-0">
+                    <Calendar className="w-3.5 h-3.5 text-slate-500" /> Filter:
                   </span>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 flex-1 min-w-[200px]">
                     <input
                       type="date"
                       value={fromDate}
                       onChange={(e) => setFromDate(e.target.value)}
-                      className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1 text-xs text-slate-800 dark:text-slate-200"
+                      className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1 text-xs text-slate-800 dark:text-slate-200 flex-1 min-w-0"
                     />
-                    <span className="text-slate-400">to</span>
+                    <span className="text-slate-400 text-xs">-</span>
                     <input
                       type="date"
                       value={toDate}
                       onChange={(e) => setToDate(e.target.value)}
-                      className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1 text-xs text-slate-800 dark:text-slate-200"
+                      className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1 text-xs text-slate-800 dark:text-slate-200 flex-1 min-w-0"
                     />
                   </div>
                   {(fromDate || toDate) && (
                     <button
                       onClick={() => { setFromDate(''); setToDate(''); }}
-                      className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium"
+                      className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-semibold"
                     >
-                      Clear Dates
+                      Clear
                     </button>
                   )}
                 </div>
-                <div className="text-[11px] text-slate-500">
-                  Total Entries: <span className="font-bold text-slate-800 dark:text-slate-200">{ledger.entries.length}</span>
+                <div className="text-[11px] text-slate-500 text-right sm:text-left">
+                  Entries: <span className="font-bold text-slate-800 dark:text-slate-200">{ledger.entries.length}</span>
                 </div>
               </div>
 
-              {/* Transactions Ledger Table */}
-              <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-xs">
+              {/* Desktop Table View (>= sm) */}
+              <div className="hidden sm:block border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-2xs">
                 <div className="max-h-[380px] overflow-y-auto">
                   <table className="w-full text-left text-xs">
                     <thead className="bg-slate-100/80 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[11px] uppercase font-bold sticky top-0 z-10">
@@ -493,7 +493,6 @@ export function AccountsView({ initialType = 'all' }: AccountsViewProps) {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900">
-                      {/* Opening Balance Row */}
                       <tr className="bg-slate-50/50 dark:bg-slate-800/30 italic text-slate-600 dark:text-slate-400 font-medium">
                         <td className="px-3 py-2 text-slate-400">—</td>
                         <td className="px-3 py-2 text-slate-400">—</td>
@@ -520,7 +519,6 @@ export function AccountsView({ initialType = 'all' }: AccountsViewProps) {
                         ledger.entries.map((item, idx) => {
                           const isReceipt = item.type === 'cash_receipt' || item.type === 'bank_receipt';
                           const isPayment = item.type === 'cash_payment' || item.type === 'bank_payment';
-                          const isTransfer = item.type === 'transfer';
 
                           return (
                             <tr key={item.transactionId || idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
@@ -567,9 +565,81 @@ export function AccountsView({ initialType = 'all' }: AccountsViewProps) {
                 </div>
               </div>
 
+              {/* Mobile Card List View (< sm) */}
+              <div className="sm:hidden space-y-2 max-h-[360px] overflow-y-auto pr-0.5">
+                <div className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/80 flex justify-between items-center text-xs">
+                  <div>
+                    <span className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-[10px] font-bold text-slate-600 dark:text-slate-300">
+                      OPENING
+                    </span>
+                    <p className="text-[11px] text-slate-500 mt-1">Starting Balance</p>
+                  </div>
+                  <span className="font-mono font-bold text-slate-800 dark:text-slate-200">
+                    {formatCurrency(ledger.openingBalance, currentCompany.currency, currentCompany.currency_symbol)}
+                  </span>
+                </div>
+
+                {ledger.entries.length === 0 ? (
+                  <div className="p-6 text-center text-slate-400 text-xs">
+                    No transactions recorded for this period.
+                  </div>
+                ) : (
+                  ledger.entries.map((item, idx) => {
+                    const isReceipt = item.type === 'cash_receipt' || item.type === 'bank_receipt';
+                    const isPayment = item.type === 'cash_payment' || item.type === 'bank_payment';
+
+                    return (
+                      <div key={item.transactionId || idx} className="p-2.5 rounded-lg bg-white dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 space-y-1.5 shadow-2xs">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <span className="font-mono font-semibold text-xs text-blue-600 dark:text-blue-400 block">
+                              {item.transactionNo}
+                            </span>
+                            <span className="text-[10px] text-slate-400 font-mono">
+                              {item.date}
+                            </span>
+                          </div>
+                          <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${
+                            isReceipt 
+                              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' 
+                              : isPayment
+                              ? 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'
+                              : 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300'
+                          }`}>
+                            {item.type.replace('_', ' ')}
+                          </span>
+                        </div>
+
+                        <div className="flex justify-between items-center text-xs pt-1 border-t border-slate-100 dark:border-slate-700/60">
+                          <span className="font-medium text-slate-700 dark:text-slate-200 truncate max-w-[150px]">
+                            {item.partyName || item.description || 'Transaction'}
+                          </span>
+                          {item.debit > 0 ? (
+                            <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-xs">
+                              +{formatCurrency(item.debit, currentCompany.currency, currentCompany.currency_symbol)}
+                            </span>
+                          ) : (
+                            <span className="font-mono font-bold text-rose-600 dark:text-rose-400 text-xs">
+                              -{formatCurrency(item.credit, currentCompany.currency, currentCompany.currency_symbol)}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex justify-between items-center text-[11px] pt-1 text-slate-500">
+                          <span>Balance:</span>
+                          <span className="font-mono font-bold text-slate-800 dark:text-slate-200">
+                            {formatCurrency(item.balance, currentCompany.currency, currentCompany.currency_symbol)}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
               {/* Modal Actions */}
               <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-                <Button type="button" variant="outline" size="sm" onClick={() => setSelectedHistoryAccount(null)}>
+                <Button type="button" variant="outline" size="sm" onClick={() => setSelectedHistoryAccount(null)} className="w-full sm:w-auto justify-center">
                   Close
                 </Button>
               </div>
@@ -587,7 +657,7 @@ export function AccountsView({ initialType = 'all' }: AccountsViewProps) {
         maxWidth="lg"
       >
         <form onSubmit={handleCreate} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <Input
               label="Account Display Name"
               required
@@ -611,8 +681,8 @@ export function AccountsView({ initialType = 'all' }: AccountsViewProps) {
           </div>
 
           {formType === 'bank' && (
-            <div className="space-y-4 p-3.5 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700">
-              <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-3 p-3 sm:p-3.5 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <Input
                   label="Bank Name"
                   required
@@ -627,7 +697,7 @@ export function AccountsView({ initialType = 'all' }: AccountsViewProps) {
                   onChange={(e) => setFormAccountNumber(e.target.value)}
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <Input
                   label="IFSC Code"
                   placeholder="e.g. HDFC0001234"
@@ -644,7 +714,7 @@ export function AccountsView({ initialType = 'all' }: AccountsViewProps) {
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <Input
               label="Opening Balance"
               type="number"
@@ -676,11 +746,11 @@ export function AccountsView({ initialType = 'all' }: AccountsViewProps) {
             onChange={(e) => setFormDescription(e.target.value)}
           />
 
-          <div className="flex justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
-            <Button type="button" variant="outline" size="sm" onClick={() => setIsCreateOpen(false)}>
+          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-slate-800">
+            <Button type="button" variant="outline" size="sm" onClick={() => setIsCreateOpen(false)} className="w-full sm:w-auto">
               Cancel
             </Button>
-            <Button type="submit" size="sm" variant="primary">
+            <Button type="submit" size="sm" variant="primary" className="w-full sm:w-auto">
               Save Account
             </Button>
           </div>
@@ -697,7 +767,7 @@ export function AccountsView({ initialType = 'all' }: AccountsViewProps) {
       >
         {editingAccount && (
           <form onSubmit={handleUpdate} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <Input
                 label="Account Display Name"
                 required
@@ -721,8 +791,8 @@ export function AccountsView({ initialType = 'all' }: AccountsViewProps) {
             </div>
 
             {editType === 'bank' && (
-              <div className="space-y-4 p-3.5 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700">
-                <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-3 p-3 sm:p-3.5 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   <Input
                     label="Bank Name"
                     required
@@ -737,7 +807,7 @@ export function AccountsView({ initialType = 'all' }: AccountsViewProps) {
                     onChange={(e) => setEditAccountNumber(e.target.value)}
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   <Input
                     label="IFSC Code"
                     placeholder="e.g. HDFC0001234"
@@ -754,7 +824,7 @@ export function AccountsView({ initialType = 'all' }: AccountsViewProps) {
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <Input
                 label="Opening Balance"
                 type="number"
@@ -786,11 +856,11 @@ export function AccountsView({ initialType = 'all' }: AccountsViewProps) {
               onChange={(e) => setEditDescription(e.target.value)}
             />
 
-            <div className="flex justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
-              <Button type="button" variant="outline" size="sm" onClick={() => setEditingAccount(null)}>
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <Button type="button" variant="outline" size="sm" onClick={() => setEditingAccount(null)} className="w-full sm:w-auto">
                 Cancel
               </Button>
-              <Button type="submit" size="sm" variant="primary">
+              <Button type="submit" size="sm" variant="primary" className="w-full sm:w-auto">
                 Update Account
               </Button>
             </div>
