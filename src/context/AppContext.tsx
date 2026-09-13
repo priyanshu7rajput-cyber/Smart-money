@@ -7,6 +7,7 @@ import {
   Party, 
   Category, 
   Transaction, 
+  TransactionEntry,
   AuditLog, 
   DashboardMetrics,
   TransactionType,
@@ -21,6 +22,18 @@ import {
   INITIAL_TRANSACTIONS, 
   INITIAL_AUDIT_LOGS 
 } from '@/lib/initial-data';
+import { createClient, isSupabaseConfigured } from '@/lib/supabase/client';
+
+function generateUUID(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
 
 interface AppContextType {
   currentCompany: Company;
@@ -126,20 +139,19 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
+  const [theme, setTheme] = useState<'light' | 'dark'>('dark');
+  const [companies, setCompanies] = useState<Company[]>([DEMO_COMPANY]);
   const [currentCompany, setCurrentCompany] = useState<Company>(DEMO_COMPANY);
-  const [companies] = useState<Company[]>(DEMO_COMPANIES);
-  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [parties, setParties] = useState<Party[]>([]);
   const [customPartyRoles, setCustomPartyRoles] = useState<string[]>(['Customer', 'Supplier / Vendor', 'Other Entity']);
-  const [theme, setTheme] = useState<'light' | 'dark'>('dark');
   const [categories, setCategories] = useState<Category[]>(INITIAL_CATEGORIES);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
-
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+  const [searchQuery, setSearchQuery] = useState<string>('');
 
   const toggleMobileSidebar = () => {
     setIsMobileSidebarOpen(prev => !prev);
@@ -184,7 +196,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return updated;
     });
 
-    // Also update any parties using this oldRole
     setParties(prev => prev.map(p => {
       if (p.type.toLowerCase() === oldRole.toLowerCase()) {
         return { ...p, type: trimmedNew, updated_at: new Date().toISOString() };
@@ -204,6 +215,257 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
+  // Helper to ensure company row exists in DB before any child record insert
+  const ensureCompanyExistsInDb = async (supabase: any, companyId: string, companyName: string, userId: string) => {
+    try {
+      await supabase.from('companies').upsert({
+        id: companyId,
+        name: companyName,
+        tax_id: 'Primary Account',
+        currency: 'INR',
+        currency_symbol: '₹',
+        financial_year_start: '2026-04-01',
+      }, { onConflict: 'id' });
+
+      await supabase.from('company_users').upsert({
+        company_id: companyId,
+        user_id: userId,
+        role: 'owner',
+      }, { onConflict: 'company_id,user_id' });
+    } catch (e) {
+      console.warn('Error verifying company in Supabase:', e);
+    }
+  };
+
+  // Helper to sync Supabase Cloud Database for an authenticated user
+  const syncSupabaseUserData = async (user: UserProfile) => {
+    if (!isSupabaseConfigured || user.id === 'usr-admin-01') {
+      return;
+    }
+
+    try {
+      const supabase = createClient();
+      const compName = user.name ? `${user.name}'s Organization` : (user.email ? `${user.email.split('@')[0]}'s Organization` : 'My Organization');
+
+      // 1. Get or create Company for this user
+      let companyId: string = user.id;
+      let activeCompany: Company | null = null;
+
+      // Check if user is linked in company_users
+      const { data: userCompData } = await supabase
+        .from('company_users')
+        .select('company_id, role, companies (*)')
+        .eq('user_id', user.id)
+        .limit(1);
+
+      if (userCompData && userCompData.length > 0 && userCompData[0].companies) {
+        const c = Array.isArray(userCompData[0].companies) ? userCompData[0].companies[0] : userCompData[0].companies;
+        companyId = c.id;
+        activeCompany = {
+          id: c.id,
+          name: c.name || compName,
+          tax_id: c.tax_id || '',
+          currency: c.currency || 'INR',
+          currency_symbol: c.currency_symbol || '₹',
+          financial_year_start: c.financial_year_start || '2026-04-01',
+          created_at: c.created_at || new Date().toISOString(),
+          updated_at: c.updated_at || new Date().toISOString(),
+        };
+      } else {
+        // Try RPC
+        const { data: rpcData } = await supabase.rpc('provision_user_company', {
+          p_company_name: compName,
+        });
+
+        if (rpcData && rpcData.company_id) {
+          companyId = rpcData.company_id;
+        } else {
+          // Direct Upsert with user.id as deterministic company UUID
+          companyId = user.id;
+          await ensureCompanyExistsInDb(supabase, companyId, compName, user.id);
+        }
+
+        activeCompany = {
+          id: companyId,
+          name: compName,
+          tax_id: 'Primary Account',
+          currency: 'INR',
+          currency_symbol: '₹',
+          financial_year_start: '2026-04-01',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+      }
+
+      setCurrentCompany(activeCompany);
+      setCompanies([activeCompany]);
+      localStorage.setItem(`cashflow_${user.id}_company`, JSON.stringify(activeCompany));
+
+      // Ensure default categories exist in Supabase
+      const { data: existingCats } = await supabase
+        .from('categories')
+        .select('id')
+        .eq('company_id', companyId)
+        .limit(1);
+
+      if (!existingCats || existingCats.length === 0) {
+        const initialCategoriesToInsert = INITIAL_CATEGORIES.map(cat => ({
+          id: generateUUID(),
+          company_id: companyId,
+          name: cat.name,
+          type: cat.type,
+          description: cat.description || '',
+          status: 'active',
+        }));
+        await supabase.from('categories').insert(initialCategoriesToInsert);
+      }
+
+      // 2. Fetch Accounts
+      const { data: dbAccounts } = await supabase
+        .from('accounts')
+        .select('*')
+        .eq('company_id', companyId)
+        .order('created_at', { ascending: false });
+
+      if (dbAccounts) {
+        const loadedAccounts = dbAccounts.map((a: any) => ({
+          id: a.id,
+          company_id: a.company_id,
+          name: a.name,
+          type: a.type,
+          bank_name: a.bank_name || '',
+          account_number: a.account_number || '',
+          ifsc: a.ifsc || '',
+          branch: a.branch || '',
+          opening_balance: Number(a.opening_balance) || 0,
+          opening_balance_type: a.opening_balance_type || 'debit',
+          description: a.description || '',
+          status: a.status || 'active',
+          created_at: a.created_at,
+          updated_at: a.updated_at,
+        }));
+        setAccounts(loadedAccounts);
+        localStorage.setItem(`cashflow_${user.id}_accounts`, JSON.stringify(loadedAccounts));
+      }
+
+      // 3. Fetch Parties
+      const { data: dbParties } = await supabase
+        .from('parties')
+        .select('*')
+        .eq('company_id', companyId)
+        .order('created_at', { ascending: false });
+
+      if (dbParties) {
+        const loadedParties = dbParties.map((p: any) => ({
+          id: p.id,
+          company_id: p.company_id,
+          name: p.name,
+          type: p.type,
+          phone: p.phone || '',
+          email: p.email || '',
+          address: p.address || '',
+          opening_balance: Number(p.opening_balance) || 0,
+          status: p.status || 'active',
+          created_at: p.created_at,
+          updated_at: p.updated_at,
+        }));
+        setParties(loadedParties);
+        localStorage.setItem(`cashflow_${user.id}_parties`, JSON.stringify(loadedParties));
+      }
+
+      // 4. Fetch Categories
+      const { data: dbCategories } = await supabase
+        .from('categories')
+        .select('*')
+        .eq('company_id', companyId)
+        .order('name', { ascending: true });
+
+      if (dbCategories && dbCategories.length > 0) {
+        const loadedCats = dbCategories.map((c: any) => ({
+          id: c.id,
+          company_id: c.company_id,
+          name: c.name,
+          type: c.type,
+          description: c.description || '',
+          status: c.status || 'active',
+          created_at: c.created_at,
+          updated_at: c.updated_at,
+        }));
+        setCategories(loadedCats);
+        localStorage.setItem(`cashflow_${user.id}_categories`, JSON.stringify(loadedCats));
+      }
+
+      // 5. Fetch Transactions and Entries
+      const { data: dbTransactions } = await supabase
+        .from('transactions')
+        .select(`
+          *,
+          entries:transaction_entries(*)
+        `)
+        .eq('company_id', companyId)
+        .order('transaction_date', { ascending: false });
+
+      if (dbTransactions) {
+        const loadedTransactions = dbTransactions.map((t: any) => ({
+          id: t.id,
+          company_id: t.company_id,
+          transaction_no: t.transaction_no,
+          transaction_type: t.transaction_type,
+          transaction_date: t.transaction_date,
+          reference_no: t.reference_no || '',
+          utr_no: t.utr_no || '',
+          cheque_no: t.cheque_no || '',
+          cheque_date: t.cheque_date || '',
+          narration: t.narration || '',
+          status: t.status || 'active',
+          void_reason: t.void_reason || '',
+          voided_by: t.voided_by || '',
+          voided_at: t.voided_at || '',
+          created_at: t.created_at,
+          updated_at: t.updated_at,
+          entries: (t.entries || []).map((e: any) => ({
+            id: e.id,
+            transaction_id: e.transaction_id,
+            company_id: e.company_id,
+            account_id: e.account_id,
+            party_id: e.party_id,
+            category_id: e.category_id,
+            debit: Number(e.debit) || 0,
+            credit: Number(e.credit) || 0,
+            created_at: e.created_at,
+          })),
+        }));
+        setTransactions(loadedTransactions);
+        localStorage.setItem(`cashflow_${user.id}_transactions`, JSON.stringify(loadedTransactions));
+      }
+
+      // 6. Fetch Audit Logs
+      const { data: dbLogs } = await supabase
+        .from('audit_logs')
+        .select('*')
+        .eq('company_id', companyId)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (dbLogs) {
+        const loadedLogs = dbLogs.map((l: any) => ({
+          id: l.id,
+          company_id: l.company_id,
+          action: l.action,
+          module: l.module,
+          record_id: l.record_id,
+          old_data: l.old_data,
+          new_data: l.new_data,
+          created_at: l.created_at,
+        }));
+        setAuditLogs(loadedLogs);
+        localStorage.setItem(`cashflow_${user.id}_audit_logs`, JSON.stringify(loadedLogs));
+      }
+    } catch (err) {
+      console.error('Failed to sync Supabase user data:', err);
+    }
+  };
+
   const loadUserDataForProfile = (user: UserProfile) => {
     setCurrentUser(user);
     if (typeof window === 'undefined') return;
@@ -219,101 +481,157 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setCustomPartyRoles(['Customer', 'Supplier / Vendor', 'Other Entity']);
     }
 
-    // Initialize or load user company entity
-    if (!isDemoAdmin) {
-      const userCompanyName = user.name ? `${user.name}'s Account` : (user.email ? `${user.email.split('@')[0]}'s Treasury` : 'My Financial Entity');
-      const userCompany: Company = {
-        id: `comp-${user.id}`,
-        name: userCompanyName,
-        tax_id: 'Primary Account',
-        currency: 'INR',
-        currency_symbol: '₹',
-        financial_year_start: '2026-04-01',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-      setCurrentCompany(userCompany);
-    } else {
+    if (isDemoAdmin) {
       setCurrentCompany(DEMO_COMPANY);
-    }
-
-    const savedAccounts = localStorage.getItem(`${storagePrefix}accounts`);
-    if (savedAccounts !== null) {
-      setAccounts(JSON.parse(savedAccounts));
+      setCompanies(DEMO_COMPANIES);
+      const savedAccounts = localStorage.getItem(`${storagePrefix}accounts`);
+      setAccounts(savedAccounts ? JSON.parse(savedAccounts) : INITIAL_ACCOUNTS);
+      const savedParties = localStorage.getItem(`${storagePrefix}parties`);
+      setParties(savedParties ? JSON.parse(savedParties) : INITIAL_PARTIES);
+      const savedCategories = localStorage.getItem(`${storagePrefix}categories`);
+      setCategories(savedCategories ? JSON.parse(savedCategories) : INITIAL_CATEGORIES);
+      const savedTransactions = localStorage.getItem(`${storagePrefix}transactions`);
+      setTransactions(savedTransactions ? JSON.parse(savedTransactions) : INITIAL_TRANSACTIONS);
+      const savedLogs = localStorage.getItem(`${storagePrefix}audit_logs`);
+      setAuditLogs(savedLogs ? JSON.parse(savedLogs) : INITIAL_AUDIT_LOGS);
     } else {
-      setAccounts(isDemoAdmin ? INITIAL_ACCOUNTS : []);
-    }
+      // Check if we have a saved company for this user
+      const savedCompStr = localStorage.getItem(`cashflow_${user.id}_company`);
+      let userCompany: Company;
+      if (savedCompStr) {
+        try {
+          userCompany = JSON.parse(savedCompStr);
+        } catch {
+          const userCompanyName = user.name ? `${user.name}'s Organization` : (user.email ? `${user.email.split('@')[0]}'s Organization` : 'My Organization');
+          userCompany = {
+            id: user.id,
+            name: userCompanyName,
+            tax_id: 'Primary Account',
+            currency: 'INR',
+            currency_symbol: '₹',
+            financial_year_start: '2026-04-01',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+        }
+      } else {
+        const userCompanyName = user.name ? `${user.name}'s Organization` : (user.email ? `${user.email.split('@')[0]}'s Organization` : 'My Organization');
+        userCompany = {
+          id: user.id,
+          name: userCompanyName,
+          tax_id: 'Primary Account',
+          currency: 'INR',
+          currency_symbol: '₹',
+          financial_year_start: '2026-04-01',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+      }
 
-    const savedParties = localStorage.getItem(`${storagePrefix}parties`);
-    if (savedParties !== null) {
-      setParties(JSON.parse(savedParties));
-    } else {
-      setParties(isDemoAdmin ? INITIAL_PARTIES : []);
-    }
+      setCurrentCompany(userCompany);
+      setCompanies([userCompany]);
 
-    const savedCategories = localStorage.getItem(`${storagePrefix}categories`);
-    if (savedCategories !== null) {
-      setCategories(JSON.parse(savedCategories));
-    } else {
-      setCategories(INITIAL_CATEGORIES);
-    }
+      // Load local cache immediately for fast render
+      const savedAccounts = localStorage.getItem(`${storagePrefix}accounts`);
+      setAccounts(savedAccounts ? JSON.parse(savedAccounts) : []);
+      const savedParties = localStorage.getItem(`${storagePrefix}parties`);
+      setParties(savedParties ? JSON.parse(savedParties) : []);
+      const savedCategories = localStorage.getItem(`${storagePrefix}categories`);
+      setCategories(savedCategories ? JSON.parse(savedCategories) : INITIAL_CATEGORIES);
+      const savedTransactions = localStorage.getItem(`${storagePrefix}transactions`);
+      setTransactions(savedTransactions ? JSON.parse(savedTransactions) : []);
+      const savedLogs = localStorage.getItem(`${storagePrefix}audit_logs`);
+      setAuditLogs(savedLogs ? JSON.parse(savedLogs) : []);
 
-    const savedTransactions = localStorage.getItem(`${storagePrefix}transactions`);
-    if (savedTransactions !== null) {
-      setTransactions(JSON.parse(savedTransactions));
-    } else {
-      setTransactions(isDemoAdmin ? INITIAL_TRANSACTIONS : []);
-    }
-
-    const savedLogs = localStorage.getItem(`${storagePrefix}audit_logs`);
-    if (savedLogs !== null) {
-      setAuditLogs(JSON.parse(savedLogs));
-    } else {
-      setAuditLogs(isDemoAdmin ? INITIAL_AUDIT_LOGS : []);
+      // Trigger cloud sync
+      syncSupabaseUserData(user);
     }
   };
 
-  // Hydrate from localStorage client-side once mounted to prevent SSR hydration mismatch
+  // Hydrate client-side once mounted and check active Supabase Auth session
   useEffect(() => {
-    try {
-      const savedTheme = localStorage.getItem('smartmoney_theme') as 'light' | 'dark' | null;
-      if (savedTheme) {
-        setTheme(savedTheme);
-        if (savedTheme === 'dark') {
-          document.documentElement.classList.add('dark');
+    async function initAuthAndData() {
+      try {
+        const savedTheme = localStorage.getItem('smartmoney_theme') as 'light' | 'dark' | null;
+        if (savedTheme) {
+          setTheme(savedTheme);
+          if (savedTheme === 'dark') {
+            document.documentElement.classList.add('dark');
+          } else {
+            document.documentElement.classList.remove('dark');
+          }
         } else {
-          document.documentElement.classList.remove('dark');
+          document.documentElement.classList.add('dark');
         }
-      } else {
-        // Default to dark theme
-        document.documentElement.classList.add('dark');
-      }
 
-      const savedUserStr = localStorage.getItem('cashflow_user');
-      if (savedUserStr) {
-        const user: UserProfile = JSON.parse(savedUserStr);
-        loadUserDataForProfile(user);
-      } else {
-        // Fallback default admin state so accounts and graphs work out-of-the-box
-        const defaultUser: UserProfile = {
-          id: 'usr-admin-01',
-          name: 'Anit Rajput',
-          email: 'admin@apex.corp',
-          role: 'owner',
-        };
-        loadUserDataForProfile(defaultUser);
+        // Check if there is an active Supabase user session
+        if (isSupabaseConfigured) {
+          const supabase = createClient();
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.user) {
+            const loggedUser: UserProfile = {
+              id: session.user.id,
+              name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0].toUpperCase() || 'User',
+              email: session.user.email || '',
+              role: 'owner',
+            };
+            loadUserDataForProfile(loggedUser);
+            setIsHydrated(true);
+            return;
+          }
+        }
+
+        const savedUserStr = localStorage.getItem('cashflow_user');
+        if (savedUserStr) {
+          const user: UserProfile = JSON.parse(savedUserStr);
+          loadUserDataForProfile(user);
+        } else {
+          const defaultUser: UserProfile = {
+            id: 'usr-admin-01',
+            name: 'Anit Rajput',
+            email: 'admin@apex.corp',
+            role: 'owner',
+          };
+          loadUserDataForProfile(defaultUser);
+        }
+      } catch (e) {
+        console.error('Failed to initialize app state:', e);
+      } finally {
+        setIsHydrated(true);
       }
-    } catch (e) {
-      console.error('Failed to load local storage state', e);
-      setAccounts([]);
-      setParties([]);
-      setCategories(INITIAL_CATEGORIES);
-      setTransactions([]);
-      setAuditLogs([]);
-    } finally {
-      setIsHydrated(true);
     }
+
+    initAuthAndData();
   }, []);
+
+  // Supabase Realtime Channel for Multi-Tab / Multi-Device Synchronization
+  useEffect(() => {
+    if (!isSupabaseConfigured || !currentUser || currentUser.id === 'usr-admin-01') return;
+
+    const supabase = createClient();
+    const channel = supabase
+      .channel(`realtime-sync-${currentUser.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, () => {
+        syncSupabaseUserData(currentUser);
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'transaction_entries' }, () => {
+        syncSupabaseUserData(currentUser);
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'accounts' }, () => {
+        syncSupabaseUserData(currentUser);
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'parties' }, () => {
+        syncSupabaseUserData(currentUser);
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, () => {
+        syncSupabaseUserData(currentUser);
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentUser?.id]);
 
   const login = async (email: string, password?: string) => {
     if (!email || !email.includes('@')) {
@@ -324,16 +642,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      const { createClient } = await import('@/lib/supabase/client');
       const supabase = createClient();
-      
       const { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password: password,
       });
 
       if (error) {
-        // Fallback for registered demo accounts if Supabase user not yet confirmed
         if (email.toLowerCase() === 'admin@apex.corp' && password === 'admin123') {
           const demoUser: UserProfile = {
             id: 'usr-admin-01',
@@ -352,15 +667,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           id: data.user.id,
           name: data.user.user_metadata?.full_name || email.split('@')[0].toUpperCase(),
           email: data.user.email || email,
-          role: 'accountant',
+          role: 'owner',
         };
         loadUserDataForProfile(loggedUser);
+        await syncSupabaseUserData(loggedUser);
         return { success: true };
       }
 
       return { success: false, error: 'User record not found.' };
     } catch (err: any) {
-      // If network fails, check demo admin account credentials
       if (email.toLowerCase() === 'admin@apex.corp' && password === 'admin123') {
         const demoUser: UserProfile = {
           id: 'usr-admin-01',
@@ -384,9 +699,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      const { createClient } = await import('@/lib/supabase/client');
       const supabase = createClient();
-
       const { data, error } = await supabase.auth.signUp({
         email: email.trim(),
         password: password,
@@ -409,6 +722,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           role: 'owner',
         };
         loadUserDataForProfile(loggedUser);
+        await syncSupabaseUserData(loggedUser);
         return { success: true };
       }
 
@@ -423,7 +737,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const logout = async () => {
     try {
-      const { createClient } = await import('@/lib/supabase/client');
       const supabase = createClient();
       await supabase.auth.signOut();
     } catch (e) {
@@ -437,9 +750,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const [searchQuery, setSearchQuery] = useState<string>('');
-
-  // Persist state changes only after client hydration is complete
+  // Local storage caching for offline backup
   useEffect(() => {
     if (isHydrated && typeof window !== 'undefined' && currentUser) {
       const storagePrefix = currentUser.id === 'usr-admin-01' ? 'cashflow_demo_' : `cashflow_${currentUser.id}_`;
@@ -475,42 +786,34 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, [auditLogs, isHydrated, currentUser]);
 
-  // Company Switcher
   const setCompany = (companyId: string) => {
     const selected = companies.find(c => c.id === companyId);
     if (selected) {
       setCurrentCompany(selected);
-      // Reset filters/searches on company switch
       setSearchQuery('');
     }
   };
 
-  // Balance Calculation Helper for single account
   const getAccountBalance = (accountId: string): number => {
     const acc = accounts.find(a => a.id === accountId);
     let balance = acc ? (acc.opening_balance_type === 'debit' ? acc.opening_balance : -acc.opening_balance) : 0;
 
-    // Filter active company transactions
     transactions
       .filter(tx => (tx.company_id === currentCompany.id || !tx.company_id) && tx.status === 'active')
       .forEach(tx => {
         if (!tx.entries || tx.entries.length === 0) return;
 
         if (tx.transaction_type === 'cash_receipt' || tx.transaction_type === 'bank_receipt') {
-          // In receipts, the asset account is debited (+ balance) on the primary leg (without party_id/category_id)
-          // or we check the entry where account_id matches and debit > 0
           const debitEntry = tx.entries.find(e => e.account_id === accountId && (e.debit || 0) > 0);
           if (debitEntry) {
             balance += debitEntry.debit;
           }
         } else if (tx.transaction_type === 'cash_payment' || tx.transaction_type === 'bank_payment') {
-          // In payments, the asset account is credited (- balance)
           const creditEntry = tx.entries.find(e => e.account_id === accountId && (e.credit || 0) > 0);
           if (creditEntry) {
             balance -= creditEntry.credit;
           }
         } else if (tx.transaction_type === 'transfer') {
-          // In transfer, destination account is debited (+), source account is credited (-)
           tx.entries.forEach(entry => {
             if (entry.account_id === accountId) {
               balance += (entry.debit || 0) - (entry.credit || 0);
@@ -524,9 +827,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // Add Account
   const addAccount = (accountData: Omit<Account, 'id' | 'created_at' | 'updated_at' | 'company_id'>) => {
+    const newId = generateUUID();
     const newAccount: Account = {
       ...accountData,
-      id: `acc-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      id: newId,
       company_id: currentCompany.id,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -534,9 +838,37 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     setAccounts(prev => [newAccount, ...prev]);
 
-    // Audit log
+    // Database persistence
+    if (isSupabaseConfigured && currentUser && currentUser.id !== 'usr-admin-01') {
+      (async () => {
+        try {
+          const supabase = createClient();
+          await ensureCompanyExistsInDb(supabase, currentCompany.id, currentCompany.name, currentUser.id);
+          const { error } = await supabase.from('accounts').insert({
+            id: newId,
+            company_id: currentCompany.id,
+            name: accountData.name,
+            type: accountData.type,
+            bank_name: accountData.bank_name || null,
+            account_number: accountData.account_number || null,
+            ifsc: accountData.ifsc || null,
+            branch: accountData.branch || null,
+            opening_balance: accountData.opening_balance || 0,
+            opening_balance_type: accountData.opening_balance_type || 'debit',
+            description: accountData.description || null,
+            status: accountData.status || 'active',
+          });
+          if (error) {
+            console.error('Supabase error on addAccount:', error.message, error.details, error.hint, error.code);
+          }
+        } catch (err: any) {
+          console.error('Failed to insert account in Supabase:', err?.message || err);
+        }
+      })();
+    }
+
     const log: AuditLog = {
-      id: `log-${Date.now()}`,
+      id: generateUUID(),
       company_id: currentCompany.id,
       action: 'CREATE',
       module: 'ACCOUNT',
@@ -556,8 +888,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     setAccounts(prev => prev.map(a => a.id === id ? { ...a, ...updates, updated_at: new Date().toISOString() } : a));
 
+    if (isSupabaseConfigured && currentUser && currentUser.id !== 'usr-admin-01') {
+      (async () => {
+        try {
+          const supabase = createClient();
+          await ensureCompanyExistsInDb(supabase, currentCompany.id, currentCompany.name, currentUser.id);
+          const { error } = await supabase.from('accounts').update({
+            ...updates,
+            updated_at: new Date().toISOString(),
+          }).eq('id', id).eq('company_id', currentCompany.id);
+          if (error) {
+            console.error('Supabase error on updateAccount:', error);
+          }
+        } catch (err) {
+          console.error('Failed to update account in Supabase:', err);
+        }
+      })();
+    }
+
     const log: AuditLog = {
-      id: `log-${Date.now()}`,
+      id: generateUUID(),
       company_id: currentCompany.id,
       action: 'UPDATE',
       module: 'ACCOUNT',
@@ -571,12 +921,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return { success: true };
   };
 
-  // Deactivate Account
   const deactivateAccount = (id: string) => {
     return updateAccount(id, { status: 'inactive' });
   };
 
-  // Delete Account (Strict check: cannot delete if transactions linked)
   const deleteAccount = (id: string) => {
     const hasTransactions = transactions.some(tx => 
       tx.company_id === currentCompany.id && 
@@ -591,24 +939,87 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
 
     setAccounts(prev => prev.filter(a => a.id !== id));
+
+    if (isSupabaseConfigured && currentUser && currentUser.id !== 'usr-admin-01') {
+      (async () => {
+        try {
+          const supabase = createClient();
+          await supabase.from('accounts').delete().eq('id', id).eq('company_id', currentCompany.id);
+        } catch (err) {
+          console.error('Failed to delete account in Supabase:', err);
+        }
+      })();
+    }
+
     return { success: true };
   };
 
   // Party operations
   const addParty = (partyData: Omit<Party, 'id' | 'created_at' | 'updated_at' | 'company_id'>) => {
+    const newId = generateUUID();
     const newParty: Party = {
       ...partyData,
-      id: `pty-${Date.now()}`,
+      id: newId,
       company_id: currentCompany.id,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
     setParties(prev => [newParty, ...prev]);
+
+    if (isSupabaseConfigured && currentUser && currentUser.id !== 'usr-admin-01') {
+      (async () => {
+        try {
+          const supabase = createClient();
+          await ensureCompanyExistsInDb(supabase, currentCompany.id, currentCompany.name, currentUser.id);
+          const lowerType = (partyData.type || '').toLowerCase();
+          const dbPartyType = lowerType.includes('supp') || lowerType.includes('vend') ? 'supplier' : (lowerType.includes('cust') ? 'customer' : 'other');
+
+          const { error } = await supabase.from('parties').insert({
+            id: newId,
+            company_id: currentCompany.id,
+            name: partyData.name,
+            type: dbPartyType,
+            phone: partyData.phone || null,
+            email: partyData.email || null,
+            address: partyData.address || null,
+            opening_balance: partyData.opening_balance || 0,
+            status: partyData.status || 'active',
+          });
+          if (error) {
+            console.error('Supabase error on addParty:', error.message, error.details, error.hint, error.code);
+          }
+        } catch (err: any) {
+          console.error('Failed to insert party in Supabase:', err?.message || err);
+        }
+      })();
+    }
+
     return { success: true, party: newParty };
   };
 
   const updateParty = (id: string, updates: Partial<Party>) => {
     setParties(prev => prev.map(p => p.id === id ? { ...p, ...updates, updated_at: new Date().toISOString() } : p));
+
+    if (isSupabaseConfigured && currentUser && currentUser.id !== 'usr-admin-01') {
+      (async () => {
+        try {
+          const supabase = createClient();
+          await ensureCompanyExistsInDb(supabase, currentCompany.id, currentCompany.name, currentUser.id);
+          const payload: any = { ...updates, updated_at: new Date().toISOString() };
+          if (updates.type) {
+            const lowerType = updates.type.toLowerCase();
+            payload.type = lowerType.includes('supp') || lowerType.includes('vend') ? 'supplier' : (lowerType.includes('cust') ? 'customer' : 'other');
+          }
+          const { error } = await supabase.from('parties').update(payload).eq('id', id).eq('company_id', currentCompany.id);
+          if (error) {
+            console.error('Supabase error on updateParty:', error.message, error.details, error.hint, error.code);
+          }
+        } catch (err: any) {
+          console.error('Failed to update party in Supabase:', err?.message || err);
+        }
+      })();
+    }
+
     return { success: true };
   };
 
@@ -626,6 +1037,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
 
     setParties(prev => prev.filter(p => p.id !== id));
+
+    if (isSupabaseConfigured && currentUser && currentUser.id !== 'usr-admin-01') {
+      (async () => {
+        try {
+          const supabase = createClient();
+          await supabase.from('parties').delete().eq('id', id).eq('company_id', currentCompany.id);
+        } catch (err) {
+          console.error('Failed to delete party in Supabase:', err);
+        }
+      })();
+    }
+
     return { success: true };
   };
 
@@ -640,36 +1063,91 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return { success: false, error: 'A category with this name and type already exists.' };
     }
 
+    const newId = generateUUID();
     const newCat: Category = {
       ...catData,
-      id: `cat-${Date.now()}`,
+      id: newId,
       company_id: currentCompany.id,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
     setCategories(prev => [newCat, ...prev]);
+
+    if (isSupabaseConfigured && currentUser && currentUser.id !== 'usr-admin-01') {
+      (async () => {
+        try {
+          const supabase = createClient();
+          await ensureCompanyExistsInDb(supabase, currentCompany.id, currentCompany.name, currentUser.id);
+          const { error } = await supabase.from('categories').insert({
+            id: newId,
+            company_id: currentCompany.id,
+            name: catData.name,
+            type: catData.type,
+            description: catData.description || null,
+            status: catData.status || 'active',
+          });
+          if (error) {
+            console.error('Supabase error on addCategory:', error.message, error.details, error.hint, error.code);
+          }
+        } catch (err: any) {
+          console.error('Failed to insert category in Supabase:', err?.message || err);
+        }
+      })();
+    }
+
     return { success: true };
   };
 
   const updateCategory = (id: string, updates: Partial<Category>) => {
     setCategories(prev => prev.map(c => c.id === id ? { ...c, ...updates, updated_at: new Date().toISOString() } : c));
+
+    if (isSupabaseConfigured && currentUser && currentUser.id !== 'usr-admin-01') {
+      (async () => {
+        try {
+          const supabase = createClient();
+          await ensureCompanyExistsInDb(supabase, currentCompany.id, currentCompany.name, currentUser.id);
+          const { error } = await supabase.from('categories').update({
+            ...updates,
+            updated_at: new Date().toISOString(),
+          }).eq('id', id).eq('company_id', currentCompany.id);
+          if (error) {
+            console.error('Supabase error on updateCategory:', error.message, error.details, error.hint, error.code);
+          }
+        } catch (err: any) {
+          console.error('Failed to update category in Supabase:', err?.message || err);
+        }
+      })();
+    }
+
     return { success: true };
   };
 
   const deleteCategory = (id: string) => {
-    const hasTransactions = transactions.some(tx =>
-      tx.company_id === currentCompany.id &&
+    const hasTransactions = transactions.some(tx => 
+      tx.company_id === currentCompany.id && 
       tx.entries?.some(e => e.category_id === id)
     );
 
     if (hasTransactions) {
-      return {
-        success: false,
-        error: 'This category cannot be deleted because transactions are linked to it. You can edit its details instead.'
+      return { 
+        success: false, 
+        error: 'This category cannot be deleted because transactions are linked to it. You can edit its details instead.' 
       };
     }
 
     setCategories(prev => prev.filter(c => c.id !== id));
+
+    if (isSupabaseConfigured && currentUser && currentUser.id !== 'usr-admin-01') {
+      (async () => {
+        try {
+          const supabase = createClient();
+          await supabase.from('categories').delete().eq('id', id).eq('company_id', currentCompany.id);
+        } catch (err) {
+          console.error('Failed to delete category in Supabase:', err);
+        }
+      })();
+    }
+
     return { success: true };
   };
 
@@ -697,7 +1175,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return { success: false, error: 'Selected account is invalid or inactive.' };
     }
 
-    // Prefix mapping
     let prefix = 'TX';
     if (data.type === 'cash_receipt') prefix = 'CR';
     else if (data.type === 'cash_payment') prefix = 'CP';
@@ -705,18 +1182,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     else if (data.type === 'bank_payment') prefix = 'BP';
     else if (data.type === 'transfer') prefix = 'TR';
 
-    // Generate safe sequential number
     const count = transactions.filter(t => t.company_id === currentCompany.id && t.transaction_type === data.type).length + 1;
     const transactionNo = `${prefix}-${String(count).padStart(6, '0')}`;
-    const txId = `tx-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+    const txId = generateUUID();
 
-    // Prepare double-entry lines
-    const entries: any[] = [];
+    const entries: TransactionEntry[] = [];
 
     if (data.type === 'cash_receipt' || data.type === 'bank_receipt') {
-      // Receipt: Asset (Cash/Bank) Debited, Party/Income Credited
       entries.push({
-        id: `te-${Date.now()}-1`,
+        id: generateUUID(),
         transaction_id: txId,
         company_id: currentCompany.id,
         account_id: data.accountId,
@@ -724,7 +1198,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         credit: 0
       });
       entries.push({
-        id: `te-${Date.now()}-2`,
+        id: generateUUID(),
         transaction_id: txId,
         company_id: currentCompany.id,
         account_id: data.accountId,
@@ -734,9 +1208,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         credit: data.amount
       });
     } else if (data.type === 'cash_payment' || data.type === 'bank_payment') {
-      // Payment: Party/Expense Debited, Asset (Cash/Bank) Credited
       entries.push({
-        id: `te-${Date.now()}-1`,
+        id: generateUUID(),
         transaction_id: txId,
         company_id: currentCompany.id,
         account_id: data.accountId,
@@ -746,7 +1219,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         credit: 0
       });
       entries.push({
-        id: `te-${Date.now()}-2`,
+        id: generateUUID(),
         transaction_id: txId,
         company_id: currentCompany.id,
         account_id: data.accountId,
@@ -765,9 +1238,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         return { success: false, error: 'Destination account is invalid or inactive.' };
       }
 
-      // Transfer: Destination Debited (receives money), Source Credited (gives money)
       entries.push({
-        id: `te-${Date.now()}-1`,
+        id: generateUUID(),
         transaction_id: txId,
         company_id: currentCompany.id,
         account_id: data.toAccountId,
@@ -775,7 +1247,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         credit: 0
       });
       entries.push({
-        id: `te-${Date.now()}-2`,
+        id: generateUUID(),
         transaction_id: txId,
         company_id: currentCompany.id,
         account_id: data.accountId,
@@ -803,9 +1275,56 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     setTransactions(prev => [newTransaction, ...prev]);
 
-    // Audit log
+    // Database persistence
+    if (isSupabaseConfigured && currentUser && currentUser.id !== 'usr-admin-01') {
+      (async () => {
+        try {
+          const supabase = createClient();
+          await ensureCompanyExistsInDb(supabase, currentCompany.id, currentCompany.name, currentUser.id);
+
+          const { error: txErr } = await supabase.from('transactions').insert({
+            id: txId,
+            company_id: currentCompany.id,
+            transaction_no: transactionNo,
+            transaction_type: data.type,
+            transaction_date: data.date,
+            reference_no: data.referenceNo || null,
+            utr_no: data.utrNo || null,
+            cheque_no: data.chequeNo || null,
+            cheque_date: data.chequeDate || null,
+            narration: data.narration || null,
+            status: 'active',
+            created_by: currentUser.id,
+          });
+
+          if (txErr) {
+            console.error('Supabase error on transaction header insert:', txErr.message, txErr.details, txErr.hint, txErr.code);
+            return;
+          }
+
+          const dbEntries = entries.map(e => ({
+            id: e.id,
+            transaction_id: txId,
+            company_id: currentCompany.id,
+            account_id: e.account_id,
+            party_id: e.party_id || null,
+            category_id: e.category_id || null,
+            debit: e.debit || 0,
+            credit: e.credit || 0,
+          }));
+
+          const { error: entriesErr } = await supabase.from('transaction_entries').insert(dbEntries);
+          if (entriesErr) {
+            console.error('Supabase error on transaction entries insert:', entriesErr.message, entriesErr.details, entriesErr.hint, entriesErr.code);
+          }
+        } catch (err: any) {
+          console.error('Failed to insert transaction in Supabase:', err?.message || err);
+        }
+      })();
+    }
+
     const log: AuditLog = {
-      id: `log-${Date.now()}`,
+      id: generateUUID(),
       company_id: currentCompany.id,
       action: 'CREATE',
       module: 'TRANSACTION',
@@ -842,9 +1361,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return t;
     }));
 
-    // Audit log
+    if (isSupabaseConfigured && currentUser && currentUser.id !== 'usr-admin-01') {
+      (async () => {
+        try {
+          const supabase = createClient();
+          await supabase.from('transactions').update({
+            status: 'voided',
+            void_reason: reason,
+            voided_by: currentUser.id,
+            voided_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          }).eq('id', id).eq('company_id', currentCompany.id);
+        } catch (err) {
+          console.error('Failed to void transaction in Supabase:', err);
+        }
+      })();
+    }
+
     const log: AuditLog = {
-      id: `log-${Date.now()}`,
+      id: generateUUID(),
       company_id: currentCompany.id,
       action: 'VOID',
       module: 'TRANSACTION',
@@ -858,16 +1393,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return { success: true };
   };
 
-  // Delete Transaction (Permanent removal)
+  // Delete Transaction
   const deleteTransaction = (id: string) => {
     const target = transactions.find(t => t.id === id && t.company_id === currentCompany.id);
     if (!target) return { success: false, error: 'Transaction not found' };
 
     setTransactions(prev => prev.filter(t => t.id !== id));
 
-    // Audit log
+    if (isSupabaseConfigured && currentUser && currentUser.id !== 'usr-admin-01') {
+      (async () => {
+        try {
+          const supabase = createClient();
+          await supabase.from('transactions').delete().eq('id', id).eq('company_id', currentCompany.id);
+        } catch (err) {
+          console.error('Failed to delete transaction in Supabase:', err);
+        }
+      })();
+    }
+
     const log: AuditLog = {
-      id: `log-${Date.now()}`,
+      id: generateUUID(),
       company_id: currentCompany.id,
       action: 'DELETE',
       module: 'TRANSACTION',
@@ -909,9 +1454,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return t;
     }));
 
-    // Audit log
+    if (isSupabaseConfigured && currentUser && currentUser.id !== 'usr-admin-01') {
+      (async () => {
+        try {
+          const supabase = createClient();
+          await supabase.from('transactions').update({
+            transaction_date: data.date,
+            reference_no: data.referenceNo || null,
+            utr_no: data.utrNo || null,
+            cheque_no: data.chequeNo || null,
+            cheque_date: data.chequeDate || null,
+            narration: data.narration || null,
+            updated_at: new Date().toISOString(),
+          }).eq('id', id).eq('company_id', currentCompany.id);
+        } catch (err) {
+          console.error('Failed to update transaction in Supabase:', err);
+        }
+      })();
+    }
+
     const log: AuditLog = {
-      id: `log-${Date.now()}`,
+      id: generateUUID(),
       company_id: currentCompany.id,
       action: 'UPDATE',
       module: 'TRANSACTION',
@@ -925,7 +1488,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return { success: true };
   };
 
-  // Calculate Account Running Ledger
   const getAccountRunningLedger = (accountId: string, fromDate?: string, toDate?: string) => {
     const acc = accounts.find(a => a.id === accountId);
     if (!acc) {
@@ -935,9 +1497,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     let runningBal = acc.opening_balance_type === 'debit' ? acc.opening_balance : -acc.opening_balance;
     let periodOpening = runningBal;
 
-    // Sort active company transactions chronologically
     const sorted = [...transactions]
-      .filter(tx => tx.company_id === currentCompany.id && tx.status === 'active')
+      .filter(tx => (tx.company_id === currentCompany.id || !tx.company_id) && tx.status === 'active')
       .sort((a, b) => new Date(a.transaction_date).getTime() - new Date(b.transaction_date).getTime());
 
     const resultEntries: any[] = [];
@@ -956,7 +1517,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       runningBal += d - c;
 
       if (isBeforeFromDate) {
-        // Accumulate into period opening balance
         periodOpening = runningBal;
         continue;
       }
@@ -968,9 +1528,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       totalDebit += d;
       totalCredit += c;
 
-      const party = tx.entries?.find(e => e.party_id)?.party_id 
-        ? parties.find(p => p.id === tx.entries?.find(e => e.party_id)?.party_id)?.name 
-        : undefined;
+      const partyId = tx.entries?.find(e => e.party_id)?.party_id;
+      const party = partyId ? parties.find(p => p.id === partyId)?.name : undefined;
 
       resultEntries.push({
         date: tx.transaction_date,
@@ -995,17 +1554,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
   };
 
-  // Dashboard Metrics
   const getDashboardMetrics = (): DashboardMetrics => {
     let cashBal = 0;
     let bankBal = 0;
 
     const companyAccounts = accounts.filter(a => (a.company_id === currentCompany.id || !a.company_id) && a.status === 'active');
-    
-    // If no filtered accounts, fallback to all accounts
-    const targetAccounts = companyAccounts.length > 0 ? companyAccounts : accounts;
 
-    targetAccounts.forEach(a => {
+    companyAccounts.forEach(a => {
       const bal = getAccountBalance(a.id);
       if (a.type === 'cash') cashBal += bal;
       else bankBal += bal;
@@ -1022,7 +1577,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     transactions
       .filter(tx => (tx.company_id === currentCompany.id || !tx.company_id) && tx.status === 'active')
       .forEach(tx => {
-        // Calculate amount of transaction
         let amount = tx.amount || 0;
         if (!amount && tx.entries && tx.entries.length > 0) {
           amount = tx.entries.reduce((max, e) => Math.max(max, e.debit || 0, e.credit || 0), 0);
@@ -1051,7 +1605,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
   };
 
-  // Chart data: Cash vs Bank breakdown
   const getCashVsBankData = () => {
     const metrics = getDashboardMetrics();
     return [
@@ -1060,13 +1613,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     ];
   };
 
-  // Chart data: Transaction volume timeline
   const getTransactionTimelineData = () => {
     const datesMap: Record<string, { receipts: number; payments: number }> = {};
 
-    // Group last 7 distinct transaction dates or default dates
     transactions
-      .filter(tx => tx.company_id === currentCompany.id && tx.status === 'active')
+      .filter(tx => (tx.company_id === currentCompany.id || !tx.company_id) && tx.status === 'active')
       .forEach(tx => {
         const d = tx.transaction_date;
         if (!datesMap[d]) datesMap[d] = { receipts: 0, payments: 0 };
@@ -1086,22 +1637,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }));
   };
 
+  const isCurrentUserDemo = currentUser?.id === 'usr-admin-01' || currentUser?.email?.toLowerCase() === 'admin@apex.corp';
+
   return (
     <AppContext.Provider
       value={{
         currentCompany,
         companies,
-        accounts: accounts.filter(a => a.company_id === currentCompany.id).length > 0 ? accounts.filter(a => a.company_id === currentCompany.id) : accounts,
-        parties: parties.filter(p => p.company_id === currentCompany.id).length > 0 ? parties.filter(p => p.company_id === currentCompany.id) : parties,
+        accounts: isCurrentUserDemo ? accounts : accounts.filter(a => a.company_id === currentCompany.id),
+        parties: isCurrentUserDemo ? parties : parties.filter(p => p.company_id === currentCompany.id),
         customPartyRoles,
         addPartyRole,
         updatePartyRole,
         deletePartyRole,
         theme,
         toggleTheme,
-        categories: categories.filter(c => c.company_id === currentCompany.id).length > 0 ? categories.filter(c => c.company_id === currentCompany.id) : categories,
-        transactions: transactions.filter(t => t.company_id === currentCompany.id).length > 0 ? transactions.filter(t => t.company_id === currentCompany.id) : transactions,
-        auditLogs: auditLogs.filter(l => l.company_id === currentCompany.id).length > 0 ? auditLogs.filter(l => l.company_id === currentCompany.id) : auditLogs,
+        categories: isCurrentUserDemo ? categories : categories.filter(c => c.company_id === currentCompany.id),
+        transactions: isCurrentUserDemo ? transactions : transactions.filter(t => t.company_id === currentCompany.id),
+        auditLogs: isCurrentUserDemo ? auditLogs : auditLogs.filter(l => l.company_id === currentCompany.id),
         searchQuery,
         setSearchQuery,
         setCompany,

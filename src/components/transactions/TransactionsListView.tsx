@@ -21,13 +21,15 @@ import {
   Printer, 
   CheckCircle2, 
   AlertCircle,
-  Download
+  Download,
+  Users,
+  Tags
 } from 'lucide-react';
 import { Transaction, TransactionType } from '@/types/database';
 import * as XLSX from 'xlsx';
 
 export function TransactionsListView() {
-  const { transactions, accounts, parties, currentCompany, voidTransaction, deleteTransaction, editTransaction } = useApp();
+  const { transactions, accounts, parties, categories, currentCompany, voidTransaction, deleteTransaction, editTransaction } = useApp();
 
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
@@ -71,12 +73,18 @@ export function TransactionsListView() {
         const matchesUtr = tx.utr_no?.toLowerCase().includes(q);
         const matchesCheque = tx.cheque_no?.toLowerCase().includes(q);
         const matchesNarr = tx.narration?.toLowerCase().includes(q);
-        return Boolean(matchesNo || matchesRef || matchesUtr || matchesCheque || matchesNarr);
+        const partyEntry = tx.entries?.find(e => e.party_id);
+        const partyName = partyEntry?.party_id ? parties.find(p => p.id === partyEntry.party_id)?.name?.toLowerCase() : '';
+        const matchesParty = partyName?.includes(q);
+        const categoryEntry = tx.entries?.find(e => e.category_id);
+        const catName = categoryEntry?.category_id ? categories.find(c => c.id === categoryEntry.category_id)?.name?.toLowerCase() : '';
+        const matchesCat = catName?.includes(q);
+        return Boolean(matchesNo || matchesRef || matchesUtr || matchesCheque || matchesNarr || matchesParty || matchesCat);
       }
 
       return true;
     });
-  }, [transactions, typeFilter, statusFilter, accountFilter, fromDate, toDate, search]);
+  }, [transactions, typeFilter, statusFilter, accountFilter, fromDate, toDate, search, parties, categories]);
 
   const totalPages = Math.ceil(filteredTransactions.length / pageSize) || 1;
   const paginatedTransactions = filteredTransactions.slice((page - 1) * pageSize, page * pageSize);
@@ -338,7 +346,8 @@ export function TransactionsListView() {
                   <th className="px-4 py-3">Tx Number</th>
                   <th className="px-4 py-3">Date</th>
                   <th className="px-4 py-3">Type</th>
-                  <th className="px-4 py-3">Primary Account</th>
+                  <th className="px-4 py-3">Party / Counterparty</th>
+                  <th className="px-4 py-3">Account</th>
                   <th className="px-4 py-3">Reference / UTR</th>
                   <th className="px-4 py-3">Narration</th>
                   <th className="px-4 py-3 text-right">Amount</th>
@@ -349,22 +358,31 @@ export function TransactionsListView() {
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {paginatedTransactions.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-4 py-10 text-center text-slate-400">
+                    <td colSpan={10} className="px-4 py-10 text-center text-slate-400">
                       No matching transactions found.
                     </td>
                   </tr>
                 ) : (
                   paginatedTransactions.map(tx => {
                     const amt = tx.entries?.reduce((max, e) => Math.max(max, e.debit || 0), 0) || 0;
-                    const firstAcc = accounts.find(a => a.id === tx.entries?.[0]?.account_id);
                     const isVoided = tx.status === 'voided';
+                    const isTransfer = tx.transaction_type === 'transfer';
+
+                    const partyEntry = tx.entries?.find(e => e.party_id);
+                    const party = partyEntry?.party_id ? parties.find(p => p.id === partyEntry.party_id) : null;
+                    const categoryEntry = tx.entries?.find(e => e.category_id);
+                    const category = categoryEntry?.category_id ? categories.find(c => c.id === categoryEntry.category_id) : null;
+
+                    const destAcc = isTransfer && tx.entries?.[0]?.account_id ? accounts.find(a => a.id === tx.entries?.[0]?.account_id) : null;
+                    const srcAcc = isTransfer && tx.entries?.[1]?.account_id ? accounts.find(a => a.id === tx.entries?.[1]?.account_id) : null;
+                    const assetAcc = accounts.find(a => a.id === (tx.entries?.find(e => !e.party_id && !e.category_id)?.account_id || tx.entries?.[0]?.account_id));
 
                     const badgeStyle: Record<string, string> = {
-                      cash_receipt: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-                      bank_receipt: 'bg-teal-50 text-teal-700 border-teal-200',
-                      cash_payment: 'bg-rose-50 text-rose-700 border-rose-200',
-                      bank_payment: 'bg-amber-50 text-amber-700 border-amber-200',
-                      transfer: 'bg-blue-50 text-blue-700 border-blue-200',
+                      cash_receipt: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800',
+                      bank_receipt: 'bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-950/40 dark:text-teal-400 dark:border-teal-800',
+                      cash_payment: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-800',
+                      bank_payment: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800',
+                      transfer: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-800',
                     };
 
                     return (
@@ -385,13 +403,51 @@ export function TransactionsListView() {
                             {tx.transaction_type.replace('_', ' ').toUpperCase()}
                           </span>
                         </td>
+                        <td className="px-4 py-3">
+                          {isTransfer ? (
+                            <div className="flex items-center gap-1.5 font-medium text-slate-800 dark:text-slate-200">
+                              <span>{srcAcc?.name || 'Source'}</span>
+                              <span className="text-blue-500 font-bold">→</span>
+                              <span>{destAcc?.name || 'Destination'}</span>
+                            </div>
+                          ) : party ? (
+                            <div>
+                              <div className="flex items-center gap-1.5 font-semibold text-slate-900 dark:text-slate-100">
+                                <Users className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
+                                <span>{party.name}</span>
+                              </div>
+                              <span className="text-[10px] text-slate-500 dark:text-slate-400 capitalize">
+                                {tx.transaction_type.includes('receipt') ? 'Received from' : 'Paid to'} • {party.type}
+                              </span>
+                            </div>
+                          ) : category ? (
+                            <div>
+                              <div className="flex items-center gap-1.5 font-semibold text-slate-900 dark:text-slate-100">
+                                <Tags className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
+                                <span>{category.name}</span>
+                              </div>
+                              <span className="text-[10px] text-slate-500 dark:text-slate-400 capitalize">
+                                Direct {category.type}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-slate-400 italic">Direct Entry</span>
+                          )}
+                        </td>
                         <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-200">
-                          {firstAcc?.name || '-'}
+                          {isTransfer ? (
+                            <span className="text-slate-500 font-mono text-[11px]">Contra Transfer</span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                              {assetAcc?.name || '-'}
+                            </span>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-slate-500 font-mono text-[11px]">
                           {tx.reference_no || tx.utr_no || tx.cheque_no || '-'}
                         </td>
-                        <td className="px-4 py-3 text-slate-600 dark:text-slate-400 max-w-[200px] truncate">
+                        <td className="px-4 py-3 text-slate-600 dark:text-slate-400 max-w-[180px] truncate">
                           {tx.narration || '-'}
                         </td>
                         <td className="px-4 py-3 text-right font-bold text-slate-900 dark:text-slate-100 font-mono">
@@ -399,7 +455,7 @@ export function TransactionsListView() {
                         </td>
                         <td className="px-4 py-3 text-center">
                           {!isVoided ? (
-                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600">
+                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
                               <CheckCircle2 className="w-3.5 h-3.5" />
                               Active
                             </span>
@@ -452,15 +508,24 @@ export function TransactionsListView() {
             ) : (
               paginatedTransactions.map(tx => {
                 const amt = tx.entries?.reduce((max, e) => Math.max(max, e.debit || 0), 0) || 0;
-                const firstAcc = accounts.find(a => a.id === tx.entries?.[0]?.account_id);
                 const isVoided = tx.status === 'voided';
+                const isTransfer = tx.transaction_type === 'transfer';
+
+                const partyEntry = tx.entries?.find(e => e.party_id);
+                const party = partyEntry?.party_id ? parties.find(p => p.id === partyEntry.party_id) : null;
+                const categoryEntry = tx.entries?.find(e => e.category_id);
+                const category = categoryEntry?.category_id ? categories.find(c => c.id === categoryEntry.category_id) : null;
+
+                const destAcc = isTransfer && tx.entries?.[0]?.account_id ? accounts.find(a => a.id === tx.entries?.[0]?.account_id) : null;
+                const srcAcc = isTransfer && tx.entries?.[1]?.account_id ? accounts.find(a => a.id === tx.entries?.[1]?.account_id) : null;
+                const assetAcc = accounts.find(a => a.id === (tx.entries?.find(e => !e.party_id && !e.category_id)?.account_id || tx.entries?.[0]?.account_id));
 
                 const badgeStyle: Record<string, string> = {
-                  cash_receipt: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-                  bank_receipt: 'bg-teal-50 text-teal-700 border-teal-200',
-                  cash_payment: 'bg-rose-50 text-rose-700 border-rose-200',
-                  bank_payment: 'bg-amber-50 text-amber-700 border-amber-200',
-                  transfer: 'bg-blue-50 text-blue-700 border-blue-200',
+                  cash_receipt: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800',
+                  bank_receipt: 'bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-950/40 dark:text-teal-400 dark:border-teal-800',
+                  cash_payment: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-800',
+                  bank_payment: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800',
+                  transfer: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-800',
                 };
 
                 return (
@@ -489,7 +554,7 @@ export function TransactionsListView() {
                         </span>
                         <div>
                           {!isVoided ? (
-                            <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-emerald-600">
+                            <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
                               <CheckCircle2 className="w-3 h-3" /> Active
                             </span>
                           ) : (
@@ -502,10 +567,34 @@ export function TransactionsListView() {
                     </div>
 
                     <div className="text-xs bg-slate-50 dark:bg-slate-800/60 p-2.5 rounded-lg space-y-1">
-                      <div className="flex justify-between text-slate-600 dark:text-slate-400">
-                        <span className="text-[11px] text-slate-400">Account:</span>
-                        <span className="font-medium text-slate-800 dark:text-slate-200">{firstAcc?.name || '-'}</span>
-                      </div>
+                      {isTransfer ? (
+                        <div className="flex justify-between text-slate-600 dark:text-slate-400">
+                          <span className="text-[11px] text-slate-400">Transfer:</span>
+                          <span className="font-semibold text-slate-800 dark:text-slate-200">{srcAcc?.name} → {destAcc?.name}</span>
+                        </div>
+                      ) : party ? (
+                        <div className="flex justify-between text-slate-600 dark:text-slate-400">
+                          <span className="text-[11px] text-slate-400">{tx.transaction_type.includes('receipt') ? 'From Party:' : 'To Party:'}</span>
+                          <span className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-1">
+                            <Users className="w-3 h-3 text-blue-500" /> {party.name}
+                          </span>
+                        </div>
+                      ) : category ? (
+                        <div className="flex justify-between text-slate-600 dark:text-slate-400">
+                          <span className="text-[11px] text-slate-400">Category:</span>
+                          <span className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-1">
+                            <Tags className="w-3 h-3 text-purple-500" /> {category.name}
+                          </span>
+                        </div>
+                      ) : null}
+
+                      {!isTransfer && (
+                        <div className="flex justify-between text-slate-600 dark:text-slate-400">
+                          <span className="text-[11px] text-slate-400">Account:</span>
+                          <span className="font-medium text-slate-800 dark:text-slate-200">{assetAcc?.name || '-'}</span>
+                        </div>
+                      )}
+
                       {(tx.reference_no || tx.utr_no || tx.cheque_no) && (
                         <div className="flex justify-between text-slate-600 dark:text-slate-400">
                           <span className="text-[11px] text-slate-400">Ref / UTR:</span>

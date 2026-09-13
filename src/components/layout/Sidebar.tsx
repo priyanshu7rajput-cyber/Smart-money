@@ -89,23 +89,23 @@ export function Sidebar() {
       )}
 
       <aside className={cn(
-        "w-64 bg-slate-900 dark:bg-slate-950 text-slate-300 flex flex-col h-screen fixed top-0 left-0 z-50 border-r border-slate-800 select-none transition-transform duration-300 ease-in-out",
+        "w-64 bg-white dark:bg-slate-950 text-slate-800 dark:text-slate-300 flex flex-col h-screen fixed top-0 left-0 z-50 border-r border-slate-200 dark:border-slate-800 select-none transition-transform duration-300 ease-in-out shadow-xs",
         isMobileSidebarOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full lg:translate-x-0"
       )}>
         {/* Brand Header with Close button for mobile */}
-        <div className="px-5 py-4.5 border-b border-slate-800 flex items-center justify-between">
+        <div className="px-5 py-4.5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-lg shadow-md shadow-blue-500/20">
               CF
             </div>
             <div>
-              <h1 className="font-bold text-base text-white tracking-tight leading-tight">CashFlow</h1>
-              <p className="text-[11px] text-slate-400 font-medium">Enterprise Treasury</p>
+              <h1 className="font-bold text-base text-slate-900 dark:text-white tracking-tight leading-tight">CashFlow</h1>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">Enterprise Treasury</p>
             </div>
           </div>
           <button
             onClick={() => setIsMobileSidebarOpen(false)}
-            className="lg:hidden p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            className="lg:hidden p-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
             title="Close menu"
           >
             <X className="w-5 h-5" />
@@ -113,8 +113,8 @@ export function Sidebar() {
         </div>
 
       {/* Multi-Company / User Entity */}
-      <div className="px-4 py-3 border-b border-slate-800/80 bg-slate-950/40">
-        <label className="text-[10px] font-semibold tracking-wider uppercase text-slate-400 block mb-1.5">
+      <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800/80 bg-slate-50/70 dark:bg-slate-950/40">
+        <label className="text-[10px] font-semibold tracking-wider uppercase text-slate-500 dark:text-slate-400 block mb-1.5">
           Active Account / Entity
         </label>
         <div className="relative">
@@ -122,26 +122,26 @@ export function Sidebar() {
             <select
               value={currentCompany.id}
               onChange={(e) => setCompany(e.target.value)}
-              className="w-full bg-slate-800/90 text-xs text-slate-200 border border-slate-700/80 rounded-md py-2 px-2.5 pr-8 appearance-none focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium cursor-pointer"
+              className="w-full bg-white dark:bg-slate-800/90 text-xs text-slate-900 dark:text-slate-200 border border-slate-300 dark:border-slate-700/80 rounded-md py-2 px-2.5 pr-8 appearance-none focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium cursor-pointer shadow-2xs"
             >
               {companies.map(c => (
-                <option key={c.id} value={c.id} className="bg-slate-900 text-white">
+                <option key={c.id} value={c.id} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">
                   {c.name}
                 </option>
               ))}
             </select>
           ) : (
-            <div className="w-full bg-slate-800/90 text-xs text-slate-200 border border-slate-700/80 rounded-md py-2 px-2.5 font-medium truncate">
+            <div className="w-full bg-white dark:bg-slate-800/90 text-xs text-slate-900 dark:text-slate-200 border border-slate-300 dark:border-slate-700/80 rounded-md py-2 px-2.5 font-medium truncate shadow-2xs">
               {currentCompany.name}
             </div>
           )}
           {companies.some(c => c.id === currentCompany.id) && (
-            <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <ChevronDown className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           )}
         </div>
-        <div className="mt-1 flex items-center justify-between text-[11px] text-slate-400 px-0.5">
+        <div className="mt-1 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 px-0.5">
           <span>{currentCompany.tax_id || (currentUser?.email ? 'Personal Vault' : 'GST Registered')}</span>
-          <span className="text-emerald-400 font-mono text-[10px]">Active</span>
+          <span className="text-emerald-600 dark:text-emerald-400 font-mono text-[10px] font-semibold">Active</span>
         </div>
       </div>
 
@@ -149,7 +149,7 @@ export function Sidebar() {
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-5">
         {navItems.map((group, idx) => (
           <div key={idx}>
-            <div className="px-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
+            <div className="px-3 text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5">
               {group.group}
             </div>
             <div className="space-y-0.5">
@@ -166,10 +166,10 @@ export function Sidebar() {
                       "flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-all group",
                       isActive
                         ? "bg-blue-600 text-white shadow-xs font-semibold"
-                        : "text-slate-300 hover:text-white hover:bg-slate-800/70"
+                        : "text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/70"
                     )}
                   >
-                    <Icon className={cn("w-4 h-4 transition-colors", isActive ? "text-white" : "text-slate-400 group-hover:text-slate-200")} />
+                    <Icon className={cn("w-4 h-4 transition-colors", isActive ? "text-white" : "text-slate-500 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-slate-200")} />
                     <span>{item.label}</span>
                   </Link>
                 );
@@ -180,7 +180,7 @@ export function Sidebar() {
       </div>
 
       {/* User & Logout Footer */}
-      <div className="p-3 border-t border-slate-800 bg-slate-950/60">
+      <div className="p-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/60">
         {isAuthenticated && currentUser ? (
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5 min-w-0">
@@ -188,14 +188,14 @@ export function Sidebar() {
                 {currentUser.name.substring(0, 2).toUpperCase()}
               </div>
               <div className="text-left leading-tight truncate">
-                <p className="text-xs font-semibold text-slate-200 truncate">{currentUser.name}</p>
-                <p className="text-[10px] text-slate-400 truncate">{currentUser.email}</p>
+                <p className="text-xs font-semibold text-slate-900 dark:text-slate-200 truncate">{currentUser.name}</p>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">{currentUser.email}</p>
               </div>
             </div>
             <button
               onClick={() => logout()}
               title="Logout session"
-              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition-colors shrink-0 ml-1"
+              className="p-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors shrink-0 ml-1 cursor-pointer"
             >
               <LogOut className="w-4 h-4" />
             </button>
