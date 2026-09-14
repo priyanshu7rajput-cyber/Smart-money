@@ -109,45 +109,21 @@ export function TopNavbar() {
           <Search className="w-4 h-4" />
         </button>
 
-        {/* Desktop Quick Transaction Actions */}
-        <div className="hidden xl:flex items-center gap-1.5">
-          <Link href="/transactions/cash-receipt">
-            <Button size="sm" variant="outline" className="text-emerald-700 dark:text-emerald-400 border-emerald-300 dark:border-emerald-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-xs py-1 px-2.5">
-              <ArrowDownLeft className="w-3.5 h-3.5" />
-              <span>Cash Receipt</span>
-            </Button>
-          </Link>
-
-          <Link href="/transactions/bank-payment">
-            <Button size="sm" variant="outline" className="text-blue-700 dark:text-blue-400 border-blue-300 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-950/40 text-xs py-1 px-2.5">
-              <ArrowUpRight className="w-3.5 h-3.5" />
-              <span>Bank Payment</span>
-            </Button>
-          </Link>
-
-          <Link href="/transactions/transfer">
-            <Button size="sm" variant="primary" className="text-xs py-1 px-2.5">
-              <ArrowLeftRight className="w-3.5 h-3.5" />
-              <span>Transfer</span>
-            </Button>
-          </Link>
-        </div>
-
-        {/* Compact Quick Action Dropdown for Tablets & Mobile */}
-        <div className="relative xl:hidden">
+        {/* Quick Action Dropdown for All Screens (Desktop, Laptop, Tablet & Mobile) */}
+        <div className="relative">
           <Button 
             size="sm" 
             variant="primary" 
             onClick={() => setIsQuickActionsOpen(prev => !prev)}
-            className="text-xs py-1.5 px-2 sm:px-3 gap-1"
+            className="text-xs py-1.5 px-2.5 sm:px-3 gap-1 shadow-xs"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">New Entry</span>
-            <ChevronDown className="w-3 h-3" />
+            <span className="hidden sm:inline font-medium">New Entry</span>
+            <ChevronDown className={`w-3 h-3 transition-transform duration-150 ${isQuickActionsOpen ? 'rotate-180' : ''}`} />
           </Button>
 
           {isQuickActionsOpen && (
-            <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100">
+            <div className="absolute right-0 mt-2 w-52 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100">
               <Link
                 href="/transactions/cash-receipt"
                 onClick={() => setIsQuickActionsOpen(false)}

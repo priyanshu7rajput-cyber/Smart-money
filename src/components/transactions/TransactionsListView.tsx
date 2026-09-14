@@ -15,6 +15,7 @@ import {
   ArrowUpRight, 
   ArrowLeftRight, 
   Eye, 
+  Edit3,
   Ban, 
   Trash2,
   FileSpreadsheet, 
@@ -52,38 +53,51 @@ export function TransactionsListView() {
 
   // Edit form state
   const [editDate, setEditDate] = useState('');
+  const [editAccountId, setEditAccountId] = useState('');
+  const [editToAccountId, setEditToAccountId] = useState('');
   const [editNarration, setEditNarration] = useState('');
   const [editRef, setEditRef] = useState('');
 
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
-  // Filter logic
+  // Filter logic - with newest entries first
   const filteredTransactions = useMemo(() => {
-    return transactions.filter(tx => {
-      if (typeFilter !== 'all' && tx.transaction_type !== typeFilter) return false;
-      if (statusFilter !== 'all' && tx.status !== statusFilter) return false;
-      if (accountFilter !== 'all' && !tx.entries?.some(e => e.account_id === accountFilter)) return false;
-      if (fromDate && tx.transaction_date < fromDate) return false;
-      if (toDate && tx.transaction_date > toDate) return false;
+    return transactions
+      .filter(tx => {
+        if (typeFilter !== 'all' && tx.transaction_type !== typeFilter) return false;
+        if (statusFilter !== 'all' && tx.status !== statusFilter) return false;
+        if (accountFilter !== 'all' && !tx.entries?.some(e => e.account_id === accountFilter)) return false;
+        if (fromDate && tx.transaction_date < fromDate) return false;
+        if (toDate && tx.transaction_date > toDate) return false;
 
-      if (search) {
-        const q = search.toLowerCase();
-        const matchesNo = tx.transaction_no.toLowerCase().includes(q);
-        const matchesRef = tx.reference_no?.toLowerCase().includes(q);
-        const matchesUtr = tx.utr_no?.toLowerCase().includes(q);
-        const matchesCheque = tx.cheque_no?.toLowerCase().includes(q);
-        const matchesNarr = tx.narration?.toLowerCase().includes(q);
-        const partyEntry = tx.entries?.find(e => e.party_id);
-        const partyName = partyEntry?.party_id ? parties.find(p => p.id === partyEntry.party_id)?.name?.toLowerCase() : '';
-        const matchesParty = partyName?.includes(q);
-        const categoryEntry = tx.entries?.find(e => e.category_id);
-        const catName = categoryEntry?.category_id ? categories.find(c => c.id === categoryEntry.category_id)?.name?.toLowerCase() : '';
-        const matchesCat = catName?.includes(q);
-        return Boolean(matchesNo || matchesRef || matchesUtr || matchesCheque || matchesNarr || matchesParty || matchesCat);
-      }
+        if (search) {
+          const q = search.toLowerCase();
+          const matchesNo = tx.transaction_no.toLowerCase().includes(q);
+          const matchesRef = tx.reference_no?.toLowerCase().includes(q);
+          const matchesUtr = tx.utr_no?.toLowerCase().includes(q);
+          const matchesCheque = tx.cheque_no?.toLowerCase().includes(q);
+          const matchesNarr = tx.narration?.toLowerCase().includes(q);
+          const partyEntry = tx.entries?.find(e => e.party_id);
+          const partyName = partyEntry?.party_id ? parties.find(p => p.id === partyEntry.party_id)?.name?.toLowerCase() : '';
+          const matchesParty = partyName?.includes(q);
+          const categoryEntry = tx.entries?.find(e => e.category_id);
+          const catName = categoryEntry?.category_id ? categories.find(c => c.id === categoryEntry.category_id)?.name?.toLowerCase() : '';
+          const matchesCat = catName?.includes(q);
+          return Boolean(matchesNo || matchesRef || matchesUtr || matchesCheque || matchesNarr || matchesParty || matchesCat);
+        }
 
-      return true;
-    });
+        return true;
+      })
+      .sort((a, b) => {
+        // Sort by date descending, then by created_at / transaction_no descending so newest entry is at top
+        if (a.transaction_date !== b.transaction_date) {
+          return b.transaction_date.localeCompare(a.transaction_date);
+        }
+        if (a.created_at && b.created_at && a.created_at !== b.created_at) {
+          return b.created_at.localeCompare(a.created_at);
+        }
+        return b.transaction_no.localeCompare(a.transaction_no);
+      });
   }, [transactions, typeFilter, statusFilter, accountFilter, fromDate, toDate, search, parties, categories]);
 
   const totalPages = Math.ceil(filteredTransactions.length / pageSize) || 1;
@@ -140,6 +154,18 @@ export function TransactionsListView() {
     setEditDate(tx.transaction_date);
     setEditNarration(tx.narration || '');
     setEditRef(tx.reference_no || '');
+
+    if (tx.transaction_type === 'transfer') {
+      const srcId = tx.entries?.[1]?.account_id || '';
+      const destId = tx.entries?.[0]?.account_id || '';
+      setEditAccountId(srcId);
+      setEditToAccountId(destId);
+    } else {
+      const assetAccId = tx.entries?.find(e => !e.party_id && !e.category_id)?.account_id || tx.entries?.[0]?.account_id || '';
+      setEditAccountId(assetAccId);
+      setEditToAccountId('');
+    }
+
     setIsEditOpen(true);
   };
 
@@ -147,8 +173,15 @@ export function TransactionsListView() {
     e.preventDefault();
     if (!selectedTx) return;
 
+    if (selectedTx.transaction_type === 'transfer' && editAccountId === editToAccountId) {
+      setNotification({ type: 'error', message: 'Source and Destination accounts cannot be the same.' });
+      return;
+    }
+
     const res = editTransaction(selectedTx.id, {
       date: editDate,
+      accountId: editAccountId || undefined,
+      toAccountId: editToAccountId || undefined,
       narration: editNarration,
       referenceNo: editRef,
     });
@@ -450,7 +483,7 @@ export function TransactionsListView() {
                         <td className="px-4 py-3 text-slate-600 dark:text-slate-400 max-w-[180px] truncate">
                           {tx.narration || '-'}
                         </td>
-                        <td className="px-4 py-3 text-right font-bold text-slate-900 dark:text-slate-100 font-mono">
+                        <td className="px-4 py-3 text-right font-bold text-slate-900 dark:text-slate-100 font-mono whitespace-nowrap">
                           {formatCurrency(amt, currentCompany.currency, currentCompany.currency_symbol)}
                         </td>
                         <td className="px-4 py-3 text-center">
@@ -475,13 +508,22 @@ export function TransactionsListView() {
                             <Eye className="w-4 h-4" />
                           </button>
                           {!isVoided && (
-                            <button
-                              onClick={() => openVoidDialog(tx)}
-                              className="p-1 text-amber-500 hover:text-amber-700 rounded hover:bg-amber-50 dark:hover:bg-amber-900/30 cursor-pointer"
-                              title="Void Financial Transaction"
-                            >
-                              <Ban className="w-4 h-4" />
-                            </button>
+                            <>
+                              <button
+                                onClick={() => openEditDialog(tx)}
+                                className="p-1 text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 rounded hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                                title="Edit Transaction & Account"
+                              >
+                                <Edit3 className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => openVoidDialog(tx)}
+                                className="p-1 text-amber-500 hover:text-amber-700 rounded hover:bg-amber-50 dark:hover:bg-amber-900/30 cursor-pointer"
+                                title="Void Financial Transaction"
+                              >
+                                <Ban className="w-4 h-4" />
+                              </button>
+                            </>
                           )}
                           <button
                             onClick={() => openDeleteDialog(tx)}
@@ -619,15 +661,26 @@ export function TransactionsListView() {
                         <span>Details</span>
                       </Button>
                       {!isVoided && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => openVoidDialog(tx)}
-                          className="text-xs py-1 px-2.5 gap-1 text-amber-600 hover:text-amber-700"
-                        >
-                          <Ban className="w-3.5 h-3.5" />
-                          <span>Void</span>
-                        </Button>
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => openEditDialog(tx)}
+                            className="text-xs py-1 px-2.5 gap-1 text-slate-700 dark:text-slate-300"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                            <span>Edit</span>
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => openVoidDialog(tx)}
+                            className="text-xs py-1 px-2.5 gap-1 text-amber-600 hover:text-amber-700"
+                          >
+                            <Ban className="w-3.5 h-3.5" />
+                            <span>Void</span>
+                          </Button>
+                        </>
                       )}
                       <Button
                         size="sm"
@@ -875,6 +928,71 @@ export function TransactionsListView() {
               value={editDate}
               onChange={(e) => setEditDate(e.target.value)}
             />
+
+            {/* Account Selector */}
+            {selectedTx.transaction_type === 'transfer' ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    Source Account
+                  </label>
+                  <select
+                    value={editAccountId}
+                    onChange={(e) => setEditAccountId(e.target.value)}
+                    required
+                    className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    {accounts.filter(a => a.status === 'active').map(a => (
+                      <option key={a.id} value={a.id}>
+                        {a.name} ({a.type.toUpperCase()})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    Destination Account
+                  </label>
+                  <select
+                    value={editToAccountId}
+                    onChange={(e) => setEditToAccountId(e.target.value)}
+                    required
+                    className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    {accounts.filter(a => a.status === 'active').map(a => (
+                      <option key={a.id} value={a.id}>
+                        {a.name} ({a.type.toUpperCase()})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Account Name (Cash / Bank)
+                </label>
+                <select
+                  value={editAccountId}
+                  onChange={(e) => setEditAccountId(e.target.value)}
+                  required
+                  className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {accounts
+                    .filter(a => {
+                      if (selectedTx.transaction_type.startsWith('cash')) return a.type === 'cash';
+                      if (selectedTx.transaction_type.startsWith('bank')) return a.type === 'bank';
+                      return true;
+                    })
+                    .map(a => (
+                      <option key={a.id} value={a.id}>
+                        {a.name} ({a.type.toUpperCase()})
+                      </option>
+                    ))}
+                </select>
+              </div>
+            )}
+
             <Input
               label="Reference / Voucher Number"
               value={editRef}

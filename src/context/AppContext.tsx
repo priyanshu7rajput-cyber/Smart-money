@@ -91,6 +91,8 @@ interface AppContextType {
   deleteTransaction: (id: string) => { success: boolean; error?: string };
   editTransaction: (id: string, data: {
     date: string;
+    accountId?: string;
+    toAccountId?: string;
     referenceNo?: string;
     utrNo?: string;
     chequeNo?: string;
@@ -1182,8 +1184,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     else if (data.type === 'bank_payment') prefix = 'BP';
     else if (data.type === 'transfer') prefix = 'TR';
 
-    const count = transactions.filter(t => t.company_id === currentCompany.id && t.transaction_type === data.type).length + 1;
-    const transactionNo = `${prefix}-${String(count).padStart(6, '0')}`;
+    // Find the max existing sequence number for this company and prefix to prevent duplicate transaction_no
+    let maxSeq = 0;
+    transactions.forEach(t => {
+      if (t.company_id === currentCompany.id && t.transaction_no && t.transaction_no.startsWith(`${prefix}-`)) {
+        const parts = t.transaction_no.split('-');
+        const seq = parseInt(parts[1], 10);
+        if (!isNaN(seq) && seq > maxSeq) {
+          maxSeq = seq;
+        }
+      }
+    });
+
+    const transactionNo = `${prefix}-${String(maxSeq + 1).padStart(6, '0')}`;
     const txId = generateUUID();
 
     const entries: TransactionEntry[] = [];
@@ -1425,9 +1438,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return { success: true };
   };
 
-  // Edit Transaction metadata
+  // Edit Transaction metadata & accounts
   const editTransaction = (id: string, data: {
     date: string;
+    accountId?: string;
+    toAccountId?: string;
     referenceNo?: string;
     utrNo?: string;
     chequeNo?: string;
@@ -1437,6 +1452,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const target = transactions.find(t => t.id === id && t.company_id === currentCompany.id);
     if (!target) return { success: false, error: 'Transaction not found' };
     if (target.status === 'voided') return { success: false, error: 'Voided transactions cannot be edited' };
+
+    let updatedEntries = [...(target.entries || [])];
+    if (data.accountId) {
+      if (target.transaction_type === 'transfer') {
+        // Entry 0: destination debit, Entry 1: source credit
+        updatedEntries = updatedEntries.map((e, idx) => {
+          if (idx === 1 && data.accountId) return { ...e, account_id: data.accountId };
+          if (idx === 0 && data.toAccountId) return { ...e, account_id: data.toAccountId };
+          return e;
+        });
+      } else {
+        // Receipt / Payment: update asset account for all entries
+        updatedEntries = updatedEntries.map(e => ({
+          ...e,
+          account_id: data.accountId!
+        }));
+      }
+    }
 
     setTransactions(prev => prev.map(t => {
       if (t.id === id) {
@@ -1448,6 +1481,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           cheque_no: data.chequeNo,
           cheque_date: data.chequeDate,
           narration: data.narration,
+          entries: updatedEntries,
           updated_at: new Date().toISOString()
         };
       }
@@ -1467,6 +1501,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             narration: data.narration || null,
             updated_at: new Date().toISOString(),
           }).eq('id', id).eq('company_id', currentCompany.id);
+
+          // Update entries accounts in Supabase if changed
+          for (const entry of updatedEntries) {
+            await supabase.from('transaction_entries').update({
+              account_id: entry.account_id
+            }).eq('id', entry.id);
+          }
         } catch (err) {
           console.error('Failed to update transaction in Supabase:', err);
         }
@@ -1479,8 +1520,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       action: 'UPDATE',
       module: 'TRANSACTION',
       record_id: id,
-      old_data: { narration: target.narration, date: target.transaction_date },
-      new_data: data,
+      old_data: { narration: target.narration, date: target.transaction_date, entries: target.entries },
+      new_data: { ...data, entries: updatedEntries },
       created_at: new Date().toISOString()
     };
     setAuditLogs(prev => [log, ...prev]);
