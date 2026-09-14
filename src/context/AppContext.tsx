@@ -130,6 +130,8 @@ interface AppContextType {
   isHydrated: boolean;
   login: (email: string, password?: string) => Promise<{ success: boolean; error?: string }>;
   signUp: (email: string, password?: string, fullName?: string) => Promise<{ success: boolean; error?: string; message?: string }>;
+  resetPassword: (email: string) => Promise<{ success: boolean; error?: string; message?: string }>;
+  updatePassword: (newPassword: string) => Promise<{ success: boolean; error?: string; message?: string }>;
   logout: () => Promise<void>;
 
   // Mobile navigation
@@ -734,6 +736,54 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       };
     } catch (err: any) {
       return { success: false, error: err.message || 'Registration failed' };
+    }
+  };
+
+  const resetPassword = async (email: string) => {
+    if (!email || !email.includes('@')) {
+      return { success: false, error: 'Please enter a valid corporate email address.' };
+    }
+
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/login` : undefined,
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      return {
+        success: true,
+        message: 'Password reset instructions sent to your email. Please check your inbox.',
+      };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed to send password reset request' };
+    }
+  };
+
+  const updatePassword = async (newPassword: string) => {
+    if (!newPassword || newPassword.length < 6) {
+      return { success: false, error: 'New password must be at least 6 characters.' };
+    }
+
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      return {
+        success: true,
+        message: 'Password updated successfully! You can now sign in with your new password.',
+      };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed to update password' };
     }
   };
 
@@ -1723,6 +1773,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         isHydrated,
         login,
         signUp,
+        resetPassword,
+        updatePassword,
         logout,
         isMobileSidebarOpen,
         setIsMobileSidebarOpen,
