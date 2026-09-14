@@ -103,14 +103,14 @@ function LoginForm() {
           setActiveTab('signin');
           return;
         }
-        router.push('/');
+        router.push('/dashboard');
       } else {
         const res = await login(email, password);
         if (!res.success) {
           setError(res.error || 'Invalid corporate credentials');
           return;
         }
-        router.push('/');
+        router.push('/dashboard');
       }
     } catch (err: any) {
       setError(err.message || 'Failed to authenticate');
