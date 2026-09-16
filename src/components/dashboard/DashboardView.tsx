@@ -52,6 +52,46 @@ export function DashboardView() {
   const cashVsBankData = getCashVsBankData();
   const timelineData = getTransactionTimelineData();
 
+  // Dynamic Capital Preservation calculations from actual company data
+  const totalInflow = metrics.monthReceipts;
+  const totalOutflow = metrics.monthPayments;
+  const netSurplus = Math.max(0, totalInflow - totalOutflow);
+  
+  let savingsRatioValue = 0;
+  if (totalInflow > 0) {
+    savingsRatioValue = (netSurplus / totalInflow) * 100;
+  } else if (transactions.length > 0) {
+    // Fallback across all active transactions if current month has low activity
+    const allReceipts = transactions
+      .filter(t => t.status === 'active' && t.transaction_type.includes('receipt'))
+      .reduce((sum, t) => sum + (t.amount || t.entries?.reduce((max, e) => Math.max(max, e.debit || 0), 0) || 0), 0);
+    const allPayments = transactions
+      .filter(t => t.status === 'active' && t.transaction_type.includes('payment'))
+      .reduce((sum, t) => sum + (t.amount || t.entries?.reduce((max, e) => Math.max(max, e.debit || 0), 0) || 0), 0);
+    if (allReceipts > 0) {
+      savingsRatioValue = (Math.max(0, allReceipts - allPayments) / allReceipts) * 100;
+    }
+  }
+
+  const savingsRatioFormatted = `${savingsRatioValue.toFixed(1)}%`;
+
+  // Liquid Runway = (Total Cash + Bank Balance) / Monthly Outflow
+  let runwayFormatted = '∞ Mos';
+  const monthlyBurn = totalOutflow > 0 ? totalOutflow : (
+    transactions
+      .filter(t => t.status === 'active' && t.transaction_type.includes('payment'))
+      .reduce((sum, t) => sum + (t.amount || t.entries?.reduce((max, e) => Math.max(max, e.debit || 0), 0) || 0), 0)
+  );
+
+  if (monthlyBurn > 0 && metrics.totalBalance > 0) {
+    const monthsRunway = metrics.totalBalance / monthlyBurn;
+    runwayFormatted = `${monthsRunway.toFixed(1)} Mos`;
+  } else if (metrics.totalBalance > 0 && monthlyBurn === 0) {
+    runwayFormatted = '12+ Mos';
+  } else {
+    runwayFormatted = '0.0 Mos';
+  }
+
   const PIE_COLORS = ['#10b981', '#3b82f6'];
 
   // Recent transactions list
@@ -250,12 +290,12 @@ export function DashboardView() {
           <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="p-4 rounded-xl bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800/40">
               <span className="text-[11px] font-bold uppercase text-purple-700 dark:text-purple-300">Average Savings Ratio</span>
-              <p className="text-2xl font-bold font-mono text-purple-900 dark:text-purple-100 mt-1">14.8%</p>
+              <p className="text-2xl font-bold font-mono text-purple-900 dark:text-purple-100 mt-1">{savingsRatioFormatted}</p>
               <p className="text-xs text-slate-500 mt-1">Surplus retained from monthly cash inflows</p>
             </div>
             <div className="p-4 rounded-xl bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800/40">
               <span className="text-[11px] font-bold uppercase text-blue-700 dark:text-blue-300">Liquid Runway</span>
-              <p className="text-2xl font-bold font-mono text-blue-900 dark:text-blue-100 mt-1">12.4 Mos</p>
+              <p className="text-2xl font-bold font-mono text-blue-900 dark:text-blue-100 mt-1">{runwayFormatted}</p>
               <p className="text-xs text-slate-500 mt-1">Reserve coverage at current monthly burn rate</p>
             </div>
           </CardContent>
