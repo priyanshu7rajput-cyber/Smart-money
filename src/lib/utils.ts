@@ -11,7 +11,7 @@ export function formatCurrency(amount: number, currency: string = "INR", symbol:
     maximumFractionDigits: 2,
   }).format(Math.abs(amount));
 
-  return `${amount < 0 ? "-" : ""}${symbol} ${formatted}`;
+  return `${amount < 0 ? "-" : ""}${symbol}\u00A0${formatted}`;
 }
 
 export function formatDate(dateString: string): string {

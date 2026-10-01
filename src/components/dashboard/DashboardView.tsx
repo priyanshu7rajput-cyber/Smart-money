@@ -115,23 +115,23 @@ export function DashboardView() {
           </p>
         </div>
 
-        <div className="flex items-center flex-wrap gap-2">
-          <Link href="/transactions/cash-receipt">
-            <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-xs">
+        <div className="grid grid-cols-3 sm:flex items-center gap-2 w-full sm:w-auto">
+          <Link href="/transactions/cash-receipt" className="w-full sm:w-auto">
+            <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-[11px] sm:text-xs w-full justify-center px-2 sm:px-3">
               <ArrowDownLeft className="w-3.5 h-3.5" />
-              Cash Receipt
+              <span className="hidden xs:inline">Cash</span> Receipt
             </Button>
           </Link>
-          <Link href="/transactions/bank-receipt">
-            <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-xs">
+          <Link href="/transactions/bank-receipt" className="w-full sm:w-auto">
+            <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-[11px] sm:text-xs w-full justify-center px-2 sm:px-3">
               <ArrowDownLeft className="w-3.5 h-3.5" />
-              Bank Receipt
+              <span className="hidden xs:inline">Bank</span> Receipt
             </Button>
           </Link>
-          <Link href="/transactions/transfer">
-            <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-xs">
+          <Link href="/transactions/transfer" className="w-full sm:w-auto">
+            <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-[11px] sm:text-xs w-full justify-center px-2 sm:px-3">
               <ArrowLeftRight className="w-3.5 h-3.5" />
-              Transfer / Contra
+              Transfer
             </Button>
           </Link>
         </div>
@@ -321,18 +321,18 @@ export function DashboardView() {
           </Link>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+          <div className="overflow-x-auto w-full">
+            <table className="w-full text-left text-xs min-w-[640px]">
               <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-800">
                 <tr>
-                  <th className="px-4 py-3">Tx No</th>
-                  <th className="px-4 py-3">Date</th>
-                  <th className="px-4 py-3">Type</th>
-                  <th className="px-4 py-3">Account</th>
-                  <th className="px-4 py-3">Reference</th>
-                  <th className="px-4 py-3 text-right">Amount</th>
-                  <th className="px-4 py-3 text-center">Status</th>
-                  <th className="px-4 py-3 text-right">Action</th>
+                  <th className="px-4 py-3 whitespace-nowrap">Tx No</th>
+                  <th className="px-4 py-3 whitespace-nowrap">Date</th>
+                  <th className="px-4 py-3 whitespace-nowrap">Type</th>
+                  <th className="px-4 py-3 whitespace-nowrap">Account</th>
+                  <th className="px-4 py-3 whitespace-nowrap">Reference</th>
+                  <th className="px-4 py-3 text-right whitespace-nowrap">Amount</th>
+                  <th className="px-4 py-3 text-center whitespace-nowrap">Status</th>
+                  <th className="px-4 py-3 text-right whitespace-nowrap">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -359,27 +359,29 @@ export function DashboardView() {
 
                     return (
                       <tr key={tx.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
-                        <td className="px-4 py-3 font-semibold font-mono text-blue-600 dark:text-blue-400">
+                        <td className="px-4 py-3 font-semibold font-mono text-blue-600 dark:text-blue-400 whitespace-nowrap">
                           {tx.transaction_no}
                         </td>
-                        <td className="px-4 py-3 text-slate-600 dark:text-slate-400">
+                        <td className="px-4 py-3 text-slate-600 dark:text-slate-400 whitespace-nowrap">
                           {formatDate(tx.transaction_date)}
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 whitespace-nowrap">
                           <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-semibold border ${typeColors[tx.transaction_type] || 'bg-slate-100'}`}>
                             {tx.transaction_type.replace('_', ' ').toUpperCase()}
                           </span>
                         </td>
-                        <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-200">
+                        <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-200 whitespace-nowrap">
                           {account?.name || '-'}
                         </td>
-                        <td className="px-4 py-3 text-slate-500 font-mono text-[11px]">
+                        <td className="px-4 py-3 text-slate-500 font-mono text-[11px] whitespace-nowrap">
                           {tx.reference_no || tx.utr_no || tx.cheque_no || '-'}
                         </td>
-                        <td className="px-4 py-3 text-right font-bold text-slate-900 dark:text-slate-100 font-mono">
-                          {formatCurrency(amt, currentCompany.currency, currentCompany.currency_symbol)}
+                        <td className="px-4 py-3 text-right font-bold text-slate-900 dark:text-slate-100 font-mono whitespace-nowrap">
+                          <span className="inline-block tabular-nums">
+                            {formatCurrency(amt, currentCompany.currency, currentCompany.currency_symbol)}
+                          </span>
                         </td>
-                        <td className="px-4 py-3 text-center">
+                        <td className="px-4 py-3 text-center whitespace-nowrap">
                           {tx.status === 'active' ? (
                             <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600">
                               <CheckCircle2 className="w-3.5 h-3.5" />
@@ -392,7 +394,7 @@ export function DashboardView() {
                             </span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-right">
+                        <td className="px-4 py-3 text-right whitespace-nowrap">
                           <Link href={`/transactions?id=${tx.id}`}>
                             <button className="text-blue-600 hover:text-blue-800 dark:text-blue-400 p-1 rounded hover:bg-blue-50 dark:hover:bg-blue-900/30">
                               <Eye className="w-4 h-4" />

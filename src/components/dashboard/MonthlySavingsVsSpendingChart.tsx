@@ -96,57 +96,59 @@ export function MonthlySavingsVsSpendingChart() {
   };
 
   return (
-    <div className="relative overflow-hidden rounded-3xl bg-[#09090b] border border-slate-800 text-white shadow-2xl p-6 md:p-8">
+    <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-[#09090b] border border-slate-800 text-white shadow-2xl p-3.5 sm:p-6 md:p-8">
       {/* Ambient background glow effects matching the uploaded mockup */}
       <div className="absolute -top-16 -left-16 w-56 h-56 bg-purple-600/20 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute top-1/2 -right-16 w-72 h-72 bg-indigo-600/15 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute -bottom-16 left-1/3 w-64 h-64 bg-violet-600/15 rounded-full blur-3xl pointer-events-none" />
 
       {/* Main Title: Monthly Savings VS Spending */}
-      <div className="relative z-10 text-center mb-8">
-        <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight flex items-center justify-center gap-3 sm:gap-4 flex-wrap">
+      <div className="relative z-10 text-center mb-5 sm:mb-8">
+        <h2 className="text-xl sm:text-3xl md:text-4xl font-extrabold tracking-tight flex items-center justify-center gap-2 sm:gap-4 flex-wrap">
           <span className="text-white drop-shadow-sm">Monthly Savings</span>
-          <span className="px-3 py-0.5 rounded-xl bg-white/10 text-slate-200 border border-white/15 text-lg sm:text-2xl font-black uppercase tracking-wider backdrop-blur-md">
+          <span className="px-2.5 py-0.5 rounded-lg sm:rounded-xl bg-white/10 text-slate-200 border border-white/15 text-sm sm:text-2xl font-black uppercase tracking-wider backdrop-blur-md">
             VS
           </span>
           <span className="bg-gradient-to-r from-purple-300 via-purple-200 to-indigo-300 bg-clip-text text-transparent drop-shadow-sm">
             Spending
           </span>
         </h2>
-        <p className="text-xs sm:text-sm text-slate-400 mt-2 max-w-lg mx-auto font-medium">
+        <p className="text-[11px] sm:text-sm text-slate-400 mt-1.5 sm:mt-2 max-w-lg mx-auto font-medium px-2">
           Comprehensive cash preservation analytics & expenditure flow for {displayName}
         </p>
       </div>
 
       {/* Dual Comparative Panel Wrapper */}
-      <div className="relative z-10 rounded-2xl border border-white/10 bg-white/[0.02] backdrop-blur-xl p-4 sm:p-6 shadow-inner">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 relative">
+      <div className="relative z-10 rounded-xl sm:rounded-2xl border border-white/10 bg-white/[0.02] backdrop-blur-xl p-2.5 sm:p-6 shadow-inner">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-12 relative">
           {/* Subtle center dividing separator on large screens */}
           <div className="hidden lg:block absolute left-1/2 top-4 bottom-4 w-px bg-gradient-to-b from-transparent via-white/15 to-transparent -translate-x-1/2" />
 
           {/* LEFT PANEL: SAVINGS */}
-          <div className="space-y-4">
+          <div className="space-y-2 sm:space-y-4">
             <div className="flex justify-center">
-              <div className="px-8 py-1.5 rounded-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold text-sm tracking-wide shadow-lg shadow-purple-500/25 border border-purple-400/30">
+              <div className="px-6 sm:px-8 py-1 sm:py-1.5 rounded-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold text-xs sm:text-sm tracking-wide shadow-lg shadow-purple-500/25 border border-purple-400/30">
                 Savings
               </div>
             </div>
 
-            <div className="h-72 sm:h-80 w-full pt-4">
+            <div className="h-56 sm:h-72 md:h-80 w-full pt-2 sm:pt-4">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={monthlyData} margin={{ top: 25, right: 10, left: -20, bottom: 0 }}>
+                <BarChart data={monthlyData} margin={{ top: 20, right: 4, left: -25, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#27272a" />
                   <XAxis 
                     dataKey="shortMonth" 
                     tickLine={false} 
                     axisLine={{ stroke: '#3f3f46' }} 
-                    tick={{ fill: '#a1a1aa', fontSize: 10, fontWeight: 500 }}
+                    tick={{ fill: '#a1a1aa', fontSize: 9, fontWeight: 500 }}
+                    interval={0}
                   />
                   <YAxis 
                     tickLine={false} 
                     axisLine={{ stroke: '#3f3f46' }} 
-                    tick={{ fill: '#71717a', fontSize: 10 }}
+                    tick={{ fill: '#71717a', fontSize: 9 }}
                     tickFormatter={(v) => v >= 1000 ? `${v / 1000}k` : v}
+                    width={35}
                   />
                   <Tooltip
                     cursor={{ fill: 'rgba(255, 255, 255, 0.05)' }}
@@ -154,9 +156,9 @@ export function MonthlySavingsVsSpendingChart() {
                       if (active && payload && payload.length) {
                         const d = payload[0].payload;
                         return (
-                          <div className="bg-slate-900/95 border border-slate-700 text-white p-2.5 rounded-xl shadow-2xl text-xs backdrop-blur-md">
+                          <div className="bg-slate-900/95 border border-slate-700 text-white p-2 sm:p-2.5 rounded-xl shadow-2xl text-xs backdrop-blur-md">
                             <p className="font-bold text-slate-200">{d.month} Savings</p>
-                            <p className="font-mono text-purple-300 font-bold text-sm mt-0.5">
+                            <p className="font-mono text-purple-300 font-bold text-xs sm:text-sm mt-0.5">
                               {formatCurrency(d.savings, currentCompany.currency, currentCompany.currency_symbol)}
                             </p>
                           </div>
@@ -167,7 +169,7 @@ export function MonthlySavingsVsSpendingChart() {
                   />
                   <Bar
                     dataKey="savings"
-                    radius={[6, 6, 0, 0]}
+                    radius={[4, 4, 0, 0]}
                     label={renderBarTopLabel}
                     animationDuration={1200}
                   >
@@ -185,28 +187,30 @@ export function MonthlySavingsVsSpendingChart() {
           </div>
 
           {/* RIGHT PANEL: SPENDING */}
-          <div className="space-y-4">
+          <div className="space-y-2 sm:space-y-4">
             <div className="flex justify-center">
-              <div className="px-8 py-1.5 rounded-full bg-gradient-to-r from-purple-500/80 to-indigo-500/80 text-white font-bold text-sm tracking-wide shadow-lg shadow-indigo-500/20 border border-indigo-400/30">
+              <div className="px-6 sm:px-8 py-1 sm:py-1.5 rounded-full bg-gradient-to-r from-purple-500/80 to-indigo-500/80 text-white font-bold text-xs sm:text-sm tracking-wide shadow-lg shadow-indigo-500/20 border border-indigo-400/30">
                 Spending
               </div>
             </div>
 
-            <div className="h-72 sm:h-80 w-full pt-4">
+            <div className="h-56 sm:h-72 md:h-80 w-full pt-2 sm:pt-4">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={monthlyData} margin={{ top: 25, right: 10, left: -10, bottom: 0 }}>
+                <BarChart data={monthlyData} margin={{ top: 20, right: 4, left: -25, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#27272a" />
                   <XAxis 
                     dataKey="shortMonth" 
                     tickLine={false} 
                     axisLine={{ stroke: '#3f3f46' }} 
-                    tick={{ fill: '#a1a1aa', fontSize: 10, fontWeight: 500 }}
+                    tick={{ fill: '#a1a1aa', fontSize: 9, fontWeight: 500 }}
+                    interval={0}
                   />
                   <YAxis 
                     tickLine={false} 
                     axisLine={{ stroke: '#3f3f46' }} 
-                    tick={{ fill: '#71717a', fontSize: 10 }}
+                    tick={{ fill: '#71717a', fontSize: 9 }}
                     tickFormatter={(v) => v >= 1000 ? `${v / 1000}k` : v}
+                    width={35}
                   />
                   <Tooltip
                     cursor={{ fill: 'rgba(255, 255, 255, 0.05)' }}
@@ -214,9 +218,9 @@ export function MonthlySavingsVsSpendingChart() {
                       if (active && payload && payload.length) {
                         const d = payload[0].payload;
                         return (
-                          <div className="bg-slate-900/95 border border-slate-700 text-white p-2.5 rounded-xl shadow-2xl text-xs backdrop-blur-md">
+                          <div className="bg-slate-900/95 border border-slate-700 text-white p-2 sm:p-2.5 rounded-xl shadow-2xl text-xs backdrop-blur-md">
                             <p className="font-bold text-slate-200">{d.month} Spending</p>
-                            <p className="font-mono text-rose-300 font-bold text-sm mt-0.5">
+                            <p className="font-mono text-rose-300 font-bold text-xs sm:text-sm mt-0.5">
                               {formatCurrency(d.spending, currentCompany.currency, currentCompany.currency_symbol)}
                             </p>
                           </div>
@@ -227,7 +231,7 @@ export function MonthlySavingsVsSpendingChart() {
                   />
                   <Bar
                     dataKey="spending"
-                    radius={[6, 6, 0, 0]}
+                    radius={[4, 4, 0, 0]}
                     label={renderBarTopLabel}
                     animationDuration={1200}
                   >
@@ -246,14 +250,15 @@ export function MonthlySavingsVsSpendingChart() {
         </div>
 
         {/* Unified Legend Bar matching the colors in the user's uploaded mockup */}
-        <div className="mt-8 pt-4 border-t border-white/10 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-[11px] text-slate-300 font-medium">
+        <div className="mt-5 sm:mt-8 pt-3 sm:pt-4 border-t border-white/10 flex flex-wrap items-center justify-center gap-x-3 sm:gap-x-4 gap-y-1.5 sm:gap-y-2 text-[10px] sm:text-[11px] text-slate-300 font-medium">
           {months.map((m) => (
-            <div key={m.key} className="flex items-center gap-1.5">
+            <div key={m.key} className="flex items-center gap-1 sm:gap-1.5">
               <span 
-                className="w-2.5 h-2.5 rounded-sm shrink-0 shadow-xs" 
+                className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-sm shrink-0 shadow-xs" 
                 style={{ backgroundColor: m.color }} 
               />
-              <span>{m.name}</span>
+              <span className="hidden sm:inline">{m.name}</span>
+              <span className="sm:hidden">{m.name.substring(0, 3)}</span>
             </div>
           ))}
         </div>

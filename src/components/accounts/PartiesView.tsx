@@ -19,10 +19,12 @@ import {
   Trash2, 
   Settings2, 
   Tag,
-  X
+  X,
+  FileText
 } from 'lucide-react';
 import { Party } from '@/types/database';
 import { formatCurrency } from '@/lib/utils';
+import { PartyStatementModal } from '@/components/accounts/PartyStatementModal';
 
 export function PartiesView() {
   const { 
@@ -34,11 +36,15 @@ export function PartiesView() {
     customPartyRoles, 
     addPartyRole, 
     updatePartyRole, 
-    deletePartyRole 
+    deletePartyRole,
+    getPartyBalance
   } = useApp();
 
   const [search, setSearch] = useState('');
   const [selectedRoleFilter, setSelectedRoleFilter] = useState<string>('all');
+  
+  // Statement Modal state
+  const [statementParty, setStatementParty] = useState<Party | null>(null);
   
   // Create Modal state
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -74,13 +80,23 @@ export function PartiesView() {
     if (selectedRoleFilter !== 'all') {
       if (p.type.toLowerCase() !== selectedRoleFilter.toLowerCase()) return false;
     }
-    if (!search) return true;
-    const q = search.toLowerCase();
+    if (!search.trim()) return true;
+    const rawSearch = search.trim().toLowerCase();
+    const cleanSearch = rawSearch.replace(/\s+/g, '');
+    const cleanName = p.name.toLowerCase().replace(/\s+/g, '');
+    const cleanPhone = (p.phone || '').replace(/\s+/g, '');
+    const cleanEmail = (p.email || '').toLowerCase().replace(/\s+/g, '');
+    const cleanType = (p.type || '').toLowerCase().replace(/\s+/g, '');
+
     return (
-      p.name.toLowerCase().includes(q) || 
-      (p.phone && p.phone.includes(q)) || 
-      (p.email && p.email.toLowerCase().includes(q)) ||
-      (p.type && p.type.toLowerCase().includes(q))
+      p.name.toLowerCase().includes(rawSearch) || 
+      cleanName.includes(cleanSearch) ||
+      (p.phone && p.phone.includes(rawSearch)) || 
+      cleanPhone.includes(cleanSearch) ||
+      (p.email && p.email.toLowerCase().includes(rawSearch)) ||
+      cleanEmail.includes(cleanSearch) ||
+      (p.type && p.type.toLowerCase().includes(rawSearch)) ||
+      cleanType.includes(cleanSearch)
     );
   });
 
@@ -291,81 +307,95 @@ export function PartiesView() {
 
       {/* Parties Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filtered.map(p => (
-          <Card key={p.id} className="hover:shadow-md transition-all duration-200 flex flex-col justify-between border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
-            <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-800/80">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0 flex-1">
-                  <h4 className="font-semibold text-sm text-slate-900 dark:text-slate-100 truncate" title={p.name}>
-                    {p.name}
-                  </h4>
-                  <div className="flex items-center gap-1.5 mt-1.5">
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-100 dark:border-blue-900/50">
-                      {p.type}
-                    </span>
-                    {p.status === 'inactive' && (
-                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-                        Inactive
+        {filtered.map(p => {
+          const netBal = getPartyBalance(p.id);
+          return (
+            <Card 
+              key={p.id} 
+              className="hover:shadow-lg hover:border-blue-300 dark:hover:border-blue-800 transition-all duration-200 flex flex-col justify-between border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 group cursor-pointer"
+              onClick={() => setStatementParty(p)}
+            >
+              <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-800/80">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <h4 className="font-semibold text-sm text-slate-900 dark:text-slate-100 truncate group-hover:text-blue-600 transition-colors" title={p.name}>
+                      {p.name}
+                    </h4>
+                    <div className="flex items-center gap-1.5 mt-1.5">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-100 dark:border-blue-900/50">
+                        {p.type}
                       </span>
-                    )}
+                      {p.status === 'inactive' && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                          Inactive
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <span className="text-[10px] uppercase font-semibold text-slate-400 block">Current Balance</span>
+                    <span className={`text-xs font-mono font-bold ${netBal >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                      {formatCurrency(netBal, currentCompany.currency, currentCompany.currency_symbol)}
+                    </span>
                   </div>
                 </div>
-                <div className="text-right shrink-0">
-                  <span className="text-[10px] uppercase font-semibold text-slate-400 block">Opening Bal</span>
-                  <span className="text-xs font-mono font-bold text-slate-800 dark:text-slate-200">
-                    {formatCurrency(p.opening_balance, currentCompany.currency, currentCompany.currency_symbol)}
-                  </span>
+              </CardHeader>
+              <CardContent className="py-3 text-xs space-y-2">
+                {p.phone && (
+                  <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400">
+                    <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    <span className="font-mono text-[11px]">{p.phone}</span>
+                  </div>
+                )}
+                {p.email && (
+                  <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400">
+                    <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    <span className="truncate">{p.email}</span>
+                  </div>
+                )}
+                {p.address && (
+                  <div className="flex items-start gap-2 text-slate-500 dark:text-slate-400">
+                    <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+                    <span className="truncate" title={p.address}>{p.address}</span>
+                  </div>
+                )}
+                {!p.phone && !p.email && !p.address && (
+                  <p className="text-[11px] text-slate-400 italic py-1">No contact details provided</p>
+                )}
+              </CardContent>
+              
+              {/* Card Action Footer */}
+              <div 
+                className="px-4 py-2.5 bg-slate-50/70 dark:bg-slate-800/40 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-xs"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  onClick={() => setStatementParty(p)}
+                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>View Statement</span>
+                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleOpenEdit(p)}
+                    className="p-1 text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors"
+                    title="Edit Party Details"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={() => handleDeleteParty(p)}
+                    className="p-1 text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors"
+                    title="Delete Party"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
                 </div>
               </div>
-            </CardHeader>
-            <CardContent className="py-3 text-xs space-y-2">
-              {p.phone && (
-                <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400">
-                  <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                  <span className="font-mono text-[11px]">{p.phone}</span>
-                </div>
-              )}
-              {p.email && (
-                <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400">
-                  <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                  <span className="truncate">{p.email}</span>
-                </div>
-              )}
-              {p.address && (
-                <div className="flex items-start gap-2 text-slate-500 dark:text-slate-400">
-                  <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
-                  <span className="truncate" title={p.address}>{p.address}</span>
-                </div>
-              )}
-              {!p.phone && !p.email && !p.address && (
-                <p className="text-[11px] text-slate-400 italic py-1">No contact details provided</p>
-              )}
-            </CardContent>
-            
-            {/* Card Action Footer */}
-            <div className="px-4 py-2.5 bg-slate-50/70 dark:bg-slate-800/40 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-xs">
-              <span className="text-slate-400 text-[10px] font-mono">
-                ID: {p.id.slice(0, 8)}
-              </span>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => handleOpenEdit(p)}
-                  className="p-1 text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors"
-                  title="Edit Party Details"
-                >
-                  <Edit3 className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  onClick={() => handleDeleteParty(p)}
-                  className="p-1 text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors"
-                  title="Delete Party"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-          </Card>
-        ))}
+            </Card>
+          );
+        })}
       </div>
 
       {filtered.length === 0 && (
@@ -727,6 +757,15 @@ export function PartiesView() {
           </div>
         </div>
       </Modal>
+
+      {/* Party Date-wise Statement / Ledger Modal */}
+      {statementParty && (
+        <PartyStatementModal
+          party={statementParty}
+          isOpen={Boolean(statementParty)}
+          onClose={() => setStatementParty(null)}
+        />
+      )}
     </div>
   );
 }

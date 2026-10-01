@@ -102,6 +102,7 @@ interface AppContextType {
 
   // Financial reporting & ledger calculation helpers
   getAccountBalance: (accountId: string) => number;
+  getPartyBalance: (partyId: string) => number;
   getAccountRunningLedger: (accountId: string, fromDate?: string, toDate?: string) => {
     openingBalance: number;
     entries: Array<{
@@ -112,6 +113,24 @@ interface AppContextType {
       description: string;
       reference?: string;
       partyName?: string;
+      debit: number;
+      credit: number;
+      balance: number;
+    }>;
+    totalDebit: number;
+    totalCredit: number;
+    closingBalance: number;
+  };
+  getPartyRunningStatement: (partyId: string, fromDate?: string, toDate?: string) => {
+    openingBalance: number;
+    entries: Array<{
+      date: string;
+      transactionNo: string;
+      transactionId: string;
+      type: TransactionType;
+      description: string;
+      reference?: string;
+      accountName?: string;
       debit: number;
       credit: number;
       balance: number;
@@ -1645,6 +1664,91 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
   };
 
+  const getPartyBalance = (partyId: string): number => {
+    const party = parties.find(p => p.id === partyId);
+    if (!party) return 0;
+
+    let balance = party.opening_balance || 0;
+    const companyTx = transactions.filter(t => (t.company_id === currentCompany.id || !t.company_id) && t.status === 'active');
+
+    for (const tx of companyTx) {
+      const partyEntry = tx.entries?.find(e => e.party_id === partyId);
+      if (partyEntry) {
+        // Debit increases receivables / advances, Credit reduces receivables
+        balance += (partyEntry.debit || 0) - (partyEntry.credit || 0);
+      }
+    }
+
+    return balance;
+  };
+
+  const getPartyRunningStatement = (partyId: string, fromDate?: string, toDate?: string) => {
+    const party = parties.find(p => p.id === partyId);
+    if (!party) {
+      return { openingBalance: 0, entries: [], totalDebit: 0, totalCredit: 0, closingBalance: 0 };
+    }
+
+    let runningBal = party.opening_balance || 0;
+    let periodOpening = runningBal;
+
+    const sorted = [...transactions]
+      .filter(tx => (tx.company_id === currentCompany.id || !tx.company_id) && tx.status === 'active')
+      .sort((a, b) => new Date(a.transaction_date).getTime() - new Date(b.transaction_date).getTime());
+
+    const resultEntries: any[] = [];
+    let totalDebit = 0;
+    let totalCredit = 0;
+
+    for (const tx of sorted) {
+      const entry = tx.entries?.find(e => e.party_id === partyId);
+      if (!entry) continue;
+
+      const isBeforeFromDate = fromDate && tx.transaction_date < fromDate;
+      const isAfterToDate = toDate && tx.transaction_date > toDate;
+
+      const d = entry.debit || 0;
+      const c = entry.credit || 0;
+      runningBal += d - c;
+
+      if (isBeforeFromDate) {
+        periodOpening = runningBal;
+        continue;
+      }
+
+      if (isAfterToDate) {
+        continue;
+      }
+
+      totalDebit += d;
+      totalCredit += c;
+
+      // Determine corresponding settlement account
+      const firstEntryAccId = tx.entries?.find(e => !e.party_id)?.account_id || tx.entries?.[0]?.account_id;
+      const acc = firstEntryAccId ? accounts.find(a => a.id === firstEntryAccId)?.name : undefined;
+
+      resultEntries.push({
+        date: tx.transaction_date,
+        transactionNo: tx.transaction_no,
+        transactionId: tx.id,
+        type: tx.transaction_type,
+        description: tx.narration || (tx.transaction_type.includes('receipt') ? 'Receipt from Party' : 'Payment to Party'),
+        reference: tx.reference_no || tx.utr_no || tx.cheque_no,
+        accountName: acc,
+        debit: d,
+        credit: c,
+        balance: runningBal
+      });
+    }
+
+    return {
+      openingBalance: fromDate ? periodOpening : (party.opening_balance || 0),
+      entries: resultEntries,
+      totalDebit,
+      totalCredit,
+      closingBalance: runningBal
+    };
+  };
+
   const getDashboardMetrics = (): DashboardMetrics => {
     let cashBal = 0;
     let bankBal = 0;
@@ -1764,7 +1868,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         deleteTransaction,
         editTransaction,
         getAccountBalance,
+        getPartyBalance,
         getAccountRunningLedger,
+        getPartyRunningStatement,
         getDashboardMetrics,
         getCashVsBankData,
         getTransactionTimelineData,

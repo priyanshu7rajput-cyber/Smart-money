@@ -151,27 +151,29 @@ export function TreasuryRedistributionFlowChart() {
       {/* Main Content Layout: Left KPI Column + Center/Right Interactive Sankey Diagram */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
         {/* Left Column: Big KPIs & Program Legend */}
-        <div className="lg:col-span-4 space-y-6">
-          <div>
-            <div className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white font-mono">
-              429.43
+        <div className="lg:col-span-4 space-y-4 sm:space-y-6">
+          <div className="grid grid-cols-2 lg:grid-cols-1 gap-4">
+            <div>
+              <div className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-white font-mono">
+                429.43
+              </div>
+              <div className="text-[11px] sm:text-xs text-slate-400 font-medium mt-0.5">Redistributed</div>
             </div>
-            <div className="text-xs text-slate-400 font-medium mt-0.5">Redistributed</div>
-          </div>
 
-          <div>
-            <div className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white font-mono">
-              487.28
+            <div>
+              <div className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-white font-mono">
+                487.28
+              </div>
+              <div className="text-[11px] sm:text-xs text-slate-400 font-medium mt-0.5">Total amount</div>
             </div>
-            <div className="text-xs text-slate-400 font-medium mt-0.5">Total amount</div>
           </div>
 
           {/* Color Dots Legend */}
-          <div className="space-y-2 pt-2 border-t border-white/[0.08]">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-2 pt-2 border-t border-white/[0.08]">
             {programs.map(p => (
-              <div key={p.name} className="flex items-center gap-2.5 text-xs text-slate-300">
+              <div key={p.name} className="flex items-center gap-2 sm:gap-2.5 text-[11px] sm:text-xs text-slate-300">
                 <span 
-                  className="w-3 h-3 rounded-full shrink-0 shadow-xs" 
+                  className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full shrink-0 shadow-xs" 
                   style={{ backgroundColor: p.color }}
                 />
                 <span className="truncate">{p.name}</span>

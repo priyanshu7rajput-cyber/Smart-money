@@ -6,6 +6,7 @@ import { useApp } from '@/context/AppContext';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
+import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { TransactionType, PartyType } from '@/types/database';
 import { ArrowDownLeft, ArrowUpRight, ArrowLeftRight, AlertCircle, CheckCircle2, Paperclip, Plus, UserPlus } from 'lucide-react';
 
@@ -354,25 +355,26 @@ export function TransactionForm({ type }: TransactionFormProps) {
                       <span>New Party</span>
                     </button>
                   </div>
-                  <select
+                  <SearchableSelect
                     value={partyId}
-                    onChange={(e) => setPartyId(e.target.value)}
-                    className="flex h-9.5 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-600"
-                  >
-                    <option value="">None / Walk-in / Direct</option>
-                    {parties.map(p => {
+                    onChange={(val) => setPartyId(val)}
+                    placeholder="None / Walk-in / Direct"
+                    searchPlaceholder="Search party name, phone, role..."
+                    emptyMessage="No party found with that name"
+                    options={parties.map((p) => {
                       const displayRole = p.type.toLowerCase() === 'customer' 
                         ? 'Customer' 
                         : p.type.toLowerCase() === 'supplier' 
                         ? 'Supplier / Vendor' 
                         : p.type;
-                      return (
-                        <option key={p.id} value={p.id}>
-                          {p.name} ({displayRole})
-                        </option>
-                      );
+                      return {
+                        value: p.id,
+                        label: p.name,
+                        subtitle: p.phone ? `Phone: ${p.phone}` : undefined,
+                        badge: displayRole,
+                      };
                     })}
-                  </select>
+                  />
                 </div>
               )}
             </div>
