@@ -1,4 +1,7 @@
-import React from 'react';
+'use client';
+
+import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { cn } from '@/lib/utils';
 import { X } from 'lucide-react';
 
@@ -12,7 +15,24 @@ interface ModalProps {
 }
 
 export function Modal({ isOpen, onClose, title, description, children, maxWidth = 'md' }: ModalProps) {
-  if (!isOpen) return null;
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Prevent background body scroll when modal is open
+  useEffect(() => {
+    if (isOpen) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [isOpen]);
+
+  if (!isOpen || !mounted) return null;
 
   const maxW = {
     sm: 'max-w-sm',
@@ -25,11 +45,19 @@ export function Modal({ isOpen, onClose, title, description, children, maxWidth 
     '5xl': 'max-w-5xl',
   }[maxWidth];
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
+  const modalContent = (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-2.5 sm:p-4 md:p-6 bg-slate-950/75 backdrop-blur-sm animate-in fade-in duration-200">
+      {/* Clickable Backdrop to close */}
+      <div 
+        className="fixed inset-0"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+
+      {/* Modal Dialog Card */}
       <div 
         className={cn(
-          "w-full bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[92vh] transition-all transform animate-in zoom-in-95 duration-200",
+          "w-full bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[90vh] relative z-10 transition-all transform animate-in zoom-in-95 duration-200",
           maxW
         )}
       >
@@ -39,6 +67,7 @@ export function Modal({ isOpen, onClose, title, description, children, maxWidth 
             {description && <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5 truncate">{description}</p>}
           </div>
           <button 
+            type="button"
             onClick={onClose}
             className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0 cursor-pointer"
             aria-label="Close modal"
@@ -52,4 +81,7 @@ export function Modal({ isOpen, onClose, title, description, children, maxWidth 
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 }
+

@@ -20,10 +20,11 @@ import {
   ChevronDown
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { Party, Transaction } from '@/types/database';
-import { formatCurrency, formatDate } from '@/lib/utils';
+import { Account, Party, Transaction } from '@/types/database';
+import { formatCurrency, formatDate, maskAccountNumber } from '@/lib/utils';
 import { PartyStatementModal } from '@/components/accounts/PartyStatementModal';
-import { Users, FileText, X as CloseIcon } from 'lucide-react';
+import { AccountStatementModal } from '@/components/accounts/AccountStatementModal';
+import { Users, FileText, Wallet, Landmark, X as CloseIcon } from 'lucide-react';
 
 export function TopNavbar() {
   const pathname = usePathname();
@@ -36,6 +37,7 @@ export function TopNavbar() {
     transactions,
     accounts,
     getPartyBalance,
+    getAccountBalance,
     isAuthenticated, 
     logout, 
     theme, 
@@ -48,10 +50,27 @@ export function TopNavbar() {
   const [isSearchVisibleMobile, setIsSearchVisibleMobile] = useState(false);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [selectedStatementParty, setSelectedStatementParty] = useState<Party | null>(null);
+  const [selectedStatementAccount, setSelectedStatementAccount] = useState<Account | null>(null);
 
-  // Compute matched parties and transactions for autocomplete dropdown
+  // Compute matched accounts, parties and transactions for autocomplete dropdown
   const normalizedQuery = (searchQuery || '').trim().toLowerCase();
   const cleanQuery = normalizedQuery.replace(/\s+/g, '');
+
+  const matchedAccounts = cleanQuery
+    ? accounts.filter((a) => {
+        const cleanName = a.name.toLowerCase().replace(/\s+/g, '');
+        const cleanBank = (a.bank_name || '').toLowerCase().replace(/\s+/g, '');
+        const cleanAccNo = (a.account_number || '').replace(/\s+/g, '');
+        const cleanType = (a.type || '').toLowerCase().replace(/\s+/g, '');
+        return (
+          a.name.toLowerCase().includes(normalizedQuery) ||
+          cleanName.includes(cleanQuery) ||
+          cleanBank.includes(cleanQuery) ||
+          cleanAccNo.includes(cleanQuery) ||
+          cleanType.includes(cleanQuery)
+        );
+      })
+    : [];
 
   const matchedParties = cleanQuery
     ? parties.filter((p) => {
@@ -164,10 +183,63 @@ export function TopNavbar() {
             />
             
             <div className="absolute top-full mt-1.5 left-0 right-0 z-50 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden animate-in fade-in-0 zoom-in-95 duration-150 max-h-[420px] overflow-y-auto">
+              {/* Accounts Section */}
+              {matchedAccounts.length > 0 && (
+                <div className="p-2 border-b border-slate-100 dark:border-slate-800">
+                  <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 flex items-center justify-between">
+                    <span>Accounts / Ledgers ({matchedAccounts.length})</span>
+                    <span className="text-[9px] text-slate-400 font-normal">Click to view statement</span>
+                  </div>
+                  <div className="space-y-1 mt-1">
+                    {matchedAccounts.map((a) => {
+                      const bal = getAccountBalance(a.id);
+                      const isCash = a.type === 'cash';
+                      return (
+                        <div
+                          key={a.id}
+                          onClick={() => {
+                            setSelectedStatementAccount(a);
+                            setIsSearchFocused(false);
+                          }}
+                          className="flex items-center justify-between p-2 rounded-xl hover:bg-blue-50/70 dark:hover:bg-blue-950/40 cursor-pointer transition-colors group"
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                              isCash 
+                                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-300' 
+                                : 'bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-300'
+                            }`}>
+                              {isCash ? <Wallet className="w-3.5 h-3.5" /> : <Landmark className="w-3.5 h-3.5" />}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-semibold text-xs text-slate-900 dark:text-slate-100 truncate group-hover:text-blue-600 transition-colors">
+                                {a.name}
+                              </p>
+                              <div className="flex items-center gap-1.5 text-[10px] text-slate-400">
+                                <span className="font-medium text-slate-500 uppercase">{a.type}</span>
+                                {a.bank_name && <span>• {a.bank_name}</span>}
+                                {a.account_number && <span>• {maskAccountNumber(a.account_number)}</span>}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="text-right shrink-0">
+                            <span className="text-[9px] text-slate-400 uppercase font-bold block">Balance</span>
+                            <span className={`font-mono text-xs font-bold ${bal >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                              {formatCurrency(bal, currentCompany.currency, currentCompany.currency_symbol)}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* Parties Section */}
               {matchedParties.length > 0 && (
                 <div className="p-2 border-b border-slate-100 dark:border-slate-800">
-                  <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 flex items-center justify-between">
+                  <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400 flex items-center justify-between">
                     <span>Parties / Entities ({matchedParties.length})</span>
                     <span className="text-[9px] text-slate-400 font-normal">Click to view statement</span>
                   </div>
@@ -181,14 +253,14 @@ export function TopNavbar() {
                             setSelectedStatementParty(p);
                             setIsSearchFocused(false);
                           }}
-                          className="flex items-center justify-between p-2 rounded-xl hover:bg-blue-50/70 dark:hover:bg-blue-950/40 cursor-pointer transition-colors group"
+                          className="flex items-center justify-between p-2 rounded-xl hover:bg-purple-50/70 dark:hover:bg-purple-950/40 cursor-pointer transition-colors group"
                         >
                           <div className="flex items-center gap-2.5 min-w-0 pr-2">
-                            <div className="w-7 h-7 rounded-lg bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-300 flex items-center justify-center shrink-0">
+                            <div className="w-7 h-7 rounded-lg bg-purple-100 text-purple-700 dark:bg-purple-900/60 dark:text-purple-300 flex items-center justify-center shrink-0">
                               <Users className="w-3.5 h-3.5" />
                             </div>
                             <div className="min-w-0">
-                              <p className="font-semibold text-xs text-slate-900 dark:text-slate-100 truncate group-hover:text-blue-600 transition-colors">
+                              <p className="font-semibold text-xs text-slate-900 dark:text-slate-100 truncate group-hover:text-purple-600 transition-colors">
                                 {p.name}
                               </p>
                               <div className="flex items-center gap-1.5 text-[10px] text-slate-400">
@@ -251,9 +323,9 @@ export function TopNavbar() {
                 </div>
               )}
 
-              {matchedParties.length === 0 && matchedTransactions.length === 0 && (
+              {matchedAccounts.length === 0 && matchedParties.length === 0 && matchedTransactions.length === 0 && (
                 <div className="p-6 text-center text-xs text-slate-400">
-                  No parties or transactions matching &ldquo;<span className="font-semibold text-slate-700 dark:text-slate-300">{searchQuery}</span>&rdquo;
+                  No accounts, parties, or transactions matching &ldquo;<span className="font-semibold text-slate-700 dark:text-slate-300">{searchQuery}</span>&rdquo;
                 </div>
               )}
             </div>
@@ -328,6 +400,15 @@ export function TopNavbar() {
               >
                 <ArrowLeftRight className="w-4 h-4" />
                 <span>Transfer / Contra</span>
+              </Link>
+              <div className="my-1 border-t border-slate-100 dark:border-slate-800" />
+              <Link
+                href="/reminders"
+                onClick={() => setIsQuickActionsOpen(false)}
+                className="flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/30"
+              >
+                <FileText className="w-4 h-4" />
+                <span>Payment Reminders</span>
               </Link>
             </div>
           )}
@@ -429,6 +510,28 @@ export function TopNavbar() {
           {/* Mobile Search Results */}
           {cleanQuery && (
             <div className="mt-2 max-h-72 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800 bg-slate-50/50 dark:bg-slate-950/40 rounded-xl p-1 text-xs">
+              {matchedAccounts.map((a) => {
+                const bal = getAccountBalance(a.id);
+                return (
+                  <div
+                    key={a.id}
+                    onClick={() => {
+                      setSelectedStatementAccount(a);
+                      setIsSearchVisibleMobile(false);
+                    }}
+                    className="p-2.5 flex items-center justify-between cursor-pointer hover:bg-white dark:hover:bg-slate-900 rounded-lg"
+                  >
+                    <div>
+                      <p className="font-bold text-slate-900 dark:text-slate-100">{a.name}</p>
+                      <span className="text-[10px] text-slate-400 font-mono uppercase">{a.type} {a.bank_name ? `• ${a.bank_name}` : ''}</span>
+                    </div>
+                    <span className={`font-mono text-xs font-bold ${bal >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      {formatCurrency(bal, currentCompany.currency, currentCompany.currency_symbol)}
+                    </span>
+                  </div>
+                );
+              })}
+
               {matchedParties.map((p) => {
                 const bal = getPartyBalance(p.id);
                 return (
@@ -453,6 +556,15 @@ export function TopNavbar() {
             </div>
           )}
         </div>
+      )}
+
+      {/* Account Statement Modal */}
+      {selectedStatementAccount && (
+        <AccountStatementModal
+          account={selectedStatementAccount}
+          isOpen={Boolean(selectedStatementAccount)}
+          onClose={() => setSelectedStatementAccount(null)}
+        />
       )}
 
       {/* Party Statement Modal */}

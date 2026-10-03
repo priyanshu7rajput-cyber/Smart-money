@@ -11,7 +11,9 @@ import {
   AuditLog, 
   DashboardMetrics,
   TransactionType,
-  UserProfile
+  UserProfile,
+  PaymentReminder,
+  ReminderStatus
 } from '@/types/database';
 import { 
   DEMO_COMPANY, 
@@ -20,7 +22,8 @@ import {
   INITIAL_PARTIES, 
   INITIAL_CATEGORIES, 
   INITIAL_TRANSACTIONS, 
-  INITIAL_AUDIT_LOGS 
+  INITIAL_AUDIT_LOGS,
+  INITIAL_REMINDERS
 } from '@/lib/initial-data';
 import { createClient, isSupabaseConfigured } from '@/lib/supabase/client';
 
@@ -43,6 +46,7 @@ interface AppContextType {
   categories: Category[];
   transactions: Transaction[];
   auditLogs: AuditLog[];
+  reminders: PaymentReminder[];
   searchQuery: string;
   setSearchQuery: (query: string) => void;
   setCompany: (companyId: string) => void;
@@ -52,6 +56,12 @@ interface AppContextType {
   updateAccount: (id: string, updates: Partial<Account>) => { success: boolean; error?: string };
   deactivateAccount: (id: string) => { success: boolean; error?: string };
   deleteAccount: (id: string) => { success: boolean; error?: string };
+
+  // Payment Reminder operations
+  addPaymentReminder: (reminder: Omit<PaymentReminder, 'id' | 'created_at' | 'updated_at' | 'company_id'>) => { success: boolean; reminder?: PaymentReminder; error?: string };
+  updatePaymentReminder: (id: string, updates: Partial<PaymentReminder>) => { success: boolean; error?: string };
+  deletePaymentReminder: (id: string) => { success: boolean; error?: string };
+  markPaymentReminderStatus: (id: string, status: ReminderStatus) => { success: boolean; error?: string };
 
   // Party operations
   customPartyRoles: string[];
@@ -89,6 +99,9 @@ interface AppContextType {
 
   voidTransaction: (id: string, reason: string) => { success: boolean; error?: string };
   deleteTransaction: (id: string) => { success: boolean; error?: string };
+  recoverTransaction: (id: string) => { success: boolean; error?: string };
+  permanentlyDeleteTransaction: (id: string) => { success: boolean; error?: string };
+  deletedTransactions: Transaction[];
   editTransaction: (id: string, data: {
     date: string;
     accountId?: string;
@@ -170,7 +183,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [customPartyRoles, setCustomPartyRoles] = useState<string[]>(['Customer', 'Supplier / Vendor', 'Other Entity']);
   const [categories, setCategories] = useState<Category[]>(INITIAL_CATEGORIES);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [deletedTransactions, setDeletedTransactions] = useState<Transaction[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [reminders, setReminders] = useState<PaymentReminder[]>([]);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
@@ -363,6 +378,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           opening_balance: Number(a.opening_balance) || 0,
           opening_balance_type: a.opening_balance_type || 'debit',
           description: a.description || '',
+          upi_id: a.upi_id || '',
           status: a.status || 'active',
           created_at: a.created_at,
           updated_at: a.updated_at,
@@ -515,8 +531,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setCategories(savedCategories ? JSON.parse(savedCategories) : INITIAL_CATEGORIES);
       const savedTransactions = localStorage.getItem(`${storagePrefix}transactions`);
       setTransactions(savedTransactions ? JSON.parse(savedTransactions) : INITIAL_TRANSACTIONS);
+      const savedDeletedTx = localStorage.getItem(`${storagePrefix}deleted_transactions`);
+      setDeletedTransactions(savedDeletedTx ? JSON.parse(savedDeletedTx) : []);
       const savedLogs = localStorage.getItem(`${storagePrefix}audit_logs`);
       setAuditLogs(savedLogs ? JSON.parse(savedLogs) : INITIAL_AUDIT_LOGS);
+      const savedReminders = localStorage.getItem(`${storagePrefix}reminders`);
+      setReminders(savedReminders ? JSON.parse(savedReminders) : INITIAL_REMINDERS);
     } else {
       // Check if we have a saved company for this user
       const savedCompStr = localStorage.getItem(`cashflow_${user.id}_company`);
@@ -563,8 +583,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setCategories(savedCategories ? JSON.parse(savedCategories) : INITIAL_CATEGORIES);
       const savedTransactions = localStorage.getItem(`${storagePrefix}transactions`);
       setTransactions(savedTransactions ? JSON.parse(savedTransactions) : []);
+      const savedDeletedTx = localStorage.getItem(`${storagePrefix}deleted_transactions`);
+      setDeletedTransactions(savedDeletedTx ? JSON.parse(savedDeletedTx) : []);
       const savedLogs = localStorage.getItem(`${storagePrefix}audit_logs`);
       setAuditLogs(savedLogs ? JSON.parse(savedLogs) : []);
+      const savedReminders = localStorage.getItem(`${storagePrefix}reminders`);
+      setReminders(savedReminders ? JSON.parse(savedReminders) : []);
 
       // Trigger cloud sync
       syncSupabaseUserData(user);
@@ -853,9 +877,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (isHydrated && typeof window !== 'undefined' && currentUser) {
       const storagePrefix = currentUser.id === 'usr-admin-01' ? 'cashflow_demo_' : `cashflow_${currentUser.id}_`;
+      localStorage.setItem(`${storagePrefix}deleted_transactions`, JSON.stringify(deletedTransactions));
+    }
+  }, [deletedTransactions, isHydrated, currentUser]);
+
+  useEffect(() => {
+    if (isHydrated && typeof window !== 'undefined' && currentUser) {
+      const storagePrefix = currentUser.id === 'usr-admin-01' ? 'cashflow_demo_' : `cashflow_${currentUser.id}_`;
       localStorage.setItem(`${storagePrefix}audit_logs`, JSON.stringify(auditLogs));
     }
   }, [auditLogs, isHydrated, currentUser]);
+
+  useEffect(() => {
+    if (isHydrated && typeof window !== 'undefined' && currentUser) {
+      const storagePrefix = currentUser.id === 'usr-admin-01' ? 'cashflow_demo_' : `cashflow_${currentUser.id}_`;
+      localStorage.setItem(`${storagePrefix}reminders`, JSON.stringify(reminders));
+    }
+  }, [reminders, isHydrated, currentUser]);
 
   const setCompany = (companyId: string) => {
     const selected = companies.find(c => c.id === companyId);
@@ -915,7 +953,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         try {
           const supabase = createClient();
           await ensureCompanyExistsInDb(supabase, currentCompany.id, currentCompany.name, currentUser.id);
-          const { error } = await supabase.from('accounts').insert({
+          const insertPayload: Record<string, any> = {
             id: newId,
             company_id: currentCompany.id,
             name: accountData.name,
@@ -928,12 +966,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             opening_balance_type: accountData.opening_balance_type || 'debit',
             description: accountData.description || null,
             status: accountData.status || 'active',
-          });
+          };
+          if (accountData.upi_id) {
+            insertPayload.upi_id = accountData.upi_id;
+          }
+
+          const { error } = await supabase.from('accounts').insert(insertPayload);
           if (error) {
-            console.error('Supabase error on addAccount:', error.message, error.details, error.hint, error.code);
+            if (error.message?.includes('upi_id') || error.details?.includes('upi_id') || error.code === 'PGRST204') {
+              delete insertPayload.upi_id;
+              await supabase.from('accounts').insert(insertPayload);
+            } else {
+              console.warn('Supabase addAccount note:', error.message || error);
+            }
           }
         } catch (err: any) {
-          console.error('Failed to insert account in Supabase:', err?.message || err);
+          console.warn('Supabase addAccount skipped:', err?.message || err);
         }
       })();
     }
@@ -964,15 +1012,35 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         try {
           const supabase = createClient();
           await ensureCompanyExistsInDb(supabase, currentCompany.id, currentCompany.name, currentUser.id);
-          const { error } = await supabase.from('accounts').update({
-            ...updates,
+          
+          // Whitelist known table columns to prevent Supabase 400 bad request errors
+          const updatePayload: Record<string, any> = {
             updated_at: new Date().toISOString(),
-          }).eq('id', id).eq('company_id', currentCompany.id);
+          };
+          if (updates.name !== undefined) updatePayload.name = updates.name;
+          if (updates.type !== undefined) updatePayload.type = updates.type;
+          if (updates.bank_name !== undefined) updatePayload.bank_name = updates.bank_name || null;
+          if (updates.account_number !== undefined) updatePayload.account_number = updates.account_number || null;
+          if (updates.ifsc !== undefined) updatePayload.ifsc = updates.ifsc || null;
+          if (updates.branch !== undefined) updatePayload.branch = updates.branch || null;
+          if (updates.opening_balance !== undefined) updatePayload.opening_balance = updates.opening_balance;
+          if (updates.opening_balance_type !== undefined) updatePayload.opening_balance_type = updates.opening_balance_type;
+          if (updates.description !== undefined) updatePayload.description = updates.description || null;
+          if (updates.status !== undefined) updatePayload.status = updates.status;
+          if (updates.upi_id !== undefined) updatePayload.upi_id = updates.upi_id || null;
+
+          const { error } = await supabase.from('accounts').update(updatePayload).eq('id', id).eq('company_id', currentCompany.id);
           if (error) {
-            console.error('Supabase error on updateAccount:', error);
+            // If upi_id column does not exist in remote table, retry update without upi_id
+            if (error.message?.includes('upi_id') || error.details?.includes('upi_id') || error.code === 'PGRST204') {
+              delete updatePayload.upi_id;
+              await supabase.from('accounts').update(updatePayload).eq('id', id).eq('company_id', currentCompany.id);
+            } else {
+              console.warn('Supabase updateAccount note:', error.message || error);
+            }
           }
-        } catch (err) {
-          console.error('Failed to update account in Supabase:', err);
+        } catch (err: any) {
+          console.warn('Supabase updateAccount skipped:', err?.message || err);
         }
       })();
     }
@@ -1023,6 +1091,70 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
 
     return { success: true };
+  };
+
+  // Payment Reminder operations
+  const addPaymentReminder = (reminderData: Omit<PaymentReminder, 'id' | 'created_at' | 'updated_at' | 'company_id'>) => {
+    const newId = generateUUID();
+    const newReminder: PaymentReminder = {
+      ...reminderData,
+      id: newId,
+      company_id: currentCompany.id,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    setReminders(prev => [newReminder, ...prev]);
+
+    const log: AuditLog = {
+      id: generateUUID(),
+      company_id: currentCompany.id,
+      action: 'CREATE',
+      module: 'REMINDER',
+      record_id: newId,
+      new_data: newReminder,
+      created_at: new Date().toISOString()
+    };
+    setAuditLogs(prev => [log, ...prev]);
+
+    return { success: true, reminder: newReminder };
+  };
+
+  const updatePaymentReminder = (id: string, updates: Partial<PaymentReminder>) => {
+    setReminders(prev => prev.map(r => r.id === id ? { ...r, ...updates, updated_at: new Date().toISOString() } : r));
+
+    const log: AuditLog = {
+      id: generateUUID(),
+      company_id: currentCompany.id,
+      action: 'UPDATE',
+      module: 'REMINDER',
+      record_id: id,
+      new_data: updates,
+      created_at: new Date().toISOString()
+    };
+    setAuditLogs(prev => [log, ...prev]);
+
+    return { success: true };
+  };
+
+  const deletePaymentReminder = (id: string) => {
+    setReminders(prev => prev.filter(r => r.id !== id));
+
+    const log: AuditLog = {
+      id: generateUUID(),
+      company_id: currentCompany.id,
+      action: 'DELETE',
+      module: 'REMINDER',
+      record_id: id,
+      created_at: new Date().toISOString()
+    };
+    setAuditLogs(prev => [log, ...prev]);
+
+    return { success: true };
+  };
+
+  const markPaymentReminderStatus = (id: string, status: ReminderStatus) => {
+    return updatePaymentReminder(id, { status });
   };
 
   // Party operations
@@ -1271,6 +1403,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const entries: TransactionEntry[] = [];
 
     if (data.type === 'cash_receipt' || data.type === 'bank_receipt') {
+      // Account is Debited (Asset increase)
       entries.push({
         id: generateUUID(),
         transaction_id: txId,
@@ -1279,27 +1412,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         debit: data.amount,
         credit: 0
       });
+      // Party / Category is Credited (Revenue / Settlement)
       entries.push({
         id: generateUUID(),
         transaction_id: txId,
         company_id: currentCompany.id,
-        account_id: data.accountId,
         party_id: data.partyId || null,
         category_id: data.categoryId || null,
         debit: 0,
         credit: data.amount
       });
     } else if (data.type === 'cash_payment' || data.type === 'bank_payment') {
+      // Party / Category is Debited (Expense / Supplier payment)
       entries.push({
         id: generateUUID(),
         transaction_id: txId,
         company_id: currentCompany.id,
-        account_id: data.accountId,
         party_id: data.partyId || null,
         category_id: data.categoryId || null,
         debit: data.amount,
         credit: 0
       });
+      // Account is Credited (Asset decrease / Outflow)
       entries.push({
         id: generateUUID(),
         transaction_id: txId,
@@ -1475,23 +1609,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return { success: true };
   };
 
-  // Delete Transaction
+  // Delete Transaction (Moves to Recent Deleted Transactions with Recover option)
   const deleteTransaction = (id: string) => {
     const target = transactions.find(t => t.id === id && t.company_id === currentCompany.id);
     if (!target) return { success: false, error: 'Transaction not found' };
 
     setTransactions(prev => prev.filter(t => t.id !== id));
-
-    if (isSupabaseConfigured && currentUser && currentUser.id !== 'usr-admin-01') {
-      (async () => {
-        try {
-          const supabase = createClient();
-          await supabase.from('transactions').delete().eq('id', id).eq('company_id', currentCompany.id);
-        } catch (err) {
-          console.error('Failed to delete transaction in Supabase:', err);
-        }
-      })();
-    }
+    // Add to recently deleted transactions list
+    setDeletedTransactions(prev => [
+      { ...target, updated_at: new Date().toISOString() },
+      ...prev.filter(t => t.id !== id)
+    ]);
 
     const log: AuditLog = {
       id: generateUUID(),
@@ -1500,6 +1628,101 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       module: 'TRANSACTION',
       record_id: id,
       old_data: { transaction_no: target.transaction_no, type: target.transaction_type, status: target.status },
+      created_at: new Date().toISOString()
+    };
+    setAuditLogs(prev => [log, ...prev]);
+
+    return { success: true };
+  };
+
+  // Recover Transaction from Recent Deleted Transactions
+  const recoverTransaction = (id: string) => {
+    const target = deletedTransactions.find(t => t.id === id && t.company_id === currentCompany.id);
+    if (!target) return { success: false, error: 'Deleted transaction not found' };
+
+    // Remove from deleted list
+    setDeletedTransactions(prev => prev.filter(t => t.id !== id));
+    // Re-insert into active transactions
+    setTransactions(prev => [
+      { ...target, status: 'active', updated_at: new Date().toISOString() },
+      ...prev
+    ]);
+
+    // Re-insert to Supabase if applicable
+    if (isSupabaseConfigured && currentUser && currentUser.id !== 'usr-admin-01') {
+      (async () => {
+        try {
+          const supabase = createClient();
+          await supabase.from('transactions').insert({
+            id: target.id,
+            company_id: currentCompany.id,
+            transaction_no: target.transaction_no,
+            transaction_type: target.transaction_type,
+            transaction_date: target.transaction_date,
+            reference_no: target.reference_no || null,
+            utr_no: target.utr_no || null,
+            cheque_no: target.cheque_no || null,
+            cheque_date: target.cheque_date || null,
+            narration: target.narration || null,
+            status: 'active',
+            created_at: target.created_at,
+            updated_at: new Date().toISOString(),
+          });
+
+          if (target.entries && target.entries.length > 0) {
+            const entriesPayload = target.entries.map(e => ({
+              id: e.id || generateUUID(),
+              transaction_id: target.id,
+              company_id: currentCompany.id,
+              account_id: e.account_id || null,
+              party_id: e.party_id || null,
+              category_id: e.category_id || null,
+              debit: e.debit || 0,
+              credit: e.credit || 0,
+            }));
+            await supabase.from('transaction_entries').insert(entriesPayload);
+          }
+        } catch (err) {
+          console.error('Failed to restore transaction in Supabase:', err);
+        }
+      })();
+    }
+
+    const log: AuditLog = {
+      id: generateUUID(),
+      company_id: currentCompany.id,
+      action: 'RECOVER',
+      module: 'TRANSACTION',
+      record_id: id,
+      new_data: { transaction_no: target.transaction_no, type: target.transaction_type },
+      created_at: new Date().toISOString()
+    };
+    setAuditLogs(prev => [log, ...prev]);
+
+    return { success: true };
+  };
+
+  // Permanently Delete Transaction from Recycle Bin
+  const permanentlyDeleteTransaction = (id: string) => {
+    setDeletedTransactions(prev => prev.filter(t => t.id !== id));
+
+    if (isSupabaseConfigured && currentUser && currentUser.id !== 'usr-admin-01') {
+      (async () => {
+        try {
+          const supabase = createClient();
+          await supabase.from('transactions').delete().eq('id', id).eq('company_id', currentCompany.id);
+        } catch (err) {
+          console.error('Failed to permanently delete transaction in Supabase:', err);
+        }
+      })();
+    }
+
+    const log: AuditLog = {
+      id: generateUUID(),
+      company_id: currentCompany.id,
+      action: 'PERMANENT_DELETE',
+      module: 'TRANSACTION',
+      record_id: id,
       created_at: new Date().toISOString()
     };
     setAuditLogs(prev => [log, ...prev]);
@@ -1616,14 +1839,58 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     let totalCredit = 0;
 
     for (const tx of sorted) {
-      const entry = tx.entries?.find(e => e.account_id === accountId);
-      if (!entry) continue;
+      if (!tx.entries || tx.entries.length === 0) continue;
+
+      let d = 0;
+      let c = 0;
+      let isRelevant = false;
+
+      if (tx.transaction_type === 'cash_receipt' || tx.transaction_type === 'bank_receipt') {
+        const debitEntry = tx.entries.find(e => e.account_id === accountId && (e.debit || 0) > 0);
+        if (debitEntry) {
+          isRelevant = true;
+          d = debitEntry.debit || 0;
+          c = 0;
+        } else {
+          // If transaction has account_id directly on any entry matching this account
+          const anyAccEntry = tx.entries.find(e => e.account_id === accountId);
+          if (anyAccEntry) {
+            isRelevant = true;
+            d = tx.amount || anyAccEntry.debit || anyAccEntry.credit || 0;
+            c = 0;
+          }
+        }
+      } else if (tx.transaction_type === 'cash_payment' || tx.transaction_type === 'bank_payment') {
+        const creditEntry = tx.entries.find(e => e.account_id === accountId && (e.credit || 0) > 0);
+        if (creditEntry) {
+          isRelevant = true;
+          d = 0;
+          c = creditEntry.credit || 0;
+        } else {
+          // Fallback if legacy entry had account_id on first entry
+          const anyAccEntry = tx.entries.find(e => e.account_id === accountId);
+          if (anyAccEntry) {
+            isRelevant = true;
+            d = 0;
+            c = tx.amount || anyAccEntry.credit || anyAccEntry.debit || 0;
+          }
+        }
+      } else if (tx.transaction_type === 'transfer') {
+        const accountEntries = tx.entries.filter(e => e.account_id === accountId);
+        if (accountEntries.length > 0) {
+          isRelevant = true;
+          accountEntries.forEach(e => {
+            d += e.debit || 0;
+            c += e.credit || 0;
+          });
+        }
+      }
+
+      if (!isRelevant) continue;
 
       const isBeforeFromDate = fromDate && tx.transaction_date < fromDate;
       const isAfterToDate = toDate && tx.transaction_date > toDate;
 
-      const d = entry.debit || 0;
-      const c = entry.credit || 0;
       runningBal += d - c;
 
       if (isBeforeFromDate) {
@@ -1638,7 +1905,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       totalDebit += d;
       totalCredit += c;
 
-      const partyId = tx.entries?.find(e => e.party_id)?.party_id;
+      const partyId = tx.entries.find(e => e.party_id)?.party_id;
       const party = partyId ? parties.find(p => p.id === partyId)?.name : undefined;
 
       resultEntries.push({
@@ -1849,7 +2116,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         toggleTheme,
         categories: isCurrentUserDemo ? categories : categories.filter(c => c.company_id === currentCompany.id),
         transactions: isCurrentUserDemo ? transactions : transactions.filter(t => t.company_id === currentCompany.id),
+        deletedTransactions: isCurrentUserDemo ? deletedTransactions : deletedTransactions.filter(t => t.company_id === currentCompany.id),
         auditLogs: isCurrentUserDemo ? auditLogs : auditLogs.filter(l => l.company_id === currentCompany.id),
+        reminders: isCurrentUserDemo ? reminders : reminders.filter(r => r.company_id === currentCompany.id),
         searchQuery,
         setSearchQuery,
         setCompany,
@@ -1857,6 +2126,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         updateAccount,
         deactivateAccount,
         deleteAccount,
+        addPaymentReminder,
+        updatePaymentReminder,
+        deletePaymentReminder,
+        markPaymentReminderStatus,
         addParty,
         updateParty,
         deleteParty,
@@ -1866,6 +2139,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         createTransaction,
         voidTransaction,
         deleteTransaction,
+        recoverTransaction,
+        permanentlyDeleteTransaction,
         editTransaction,
         getAccountBalance,
         getPartyBalance,

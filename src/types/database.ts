@@ -43,6 +43,7 @@ export interface Account {
   account_number?: string;
   ifsc?: string;
   branch?: string;
+  upi_id?: string;
   opening_balance: number;
   opening_balance_type: BalanceType;
   description?: string;
@@ -83,7 +84,7 @@ export interface TransactionEntry {
   id?: string;
   transaction_id?: string;
   company_id: string;
-  account_id: string;
+  account_id?: string | null;
   party_id?: string | null;
   category_id?: string | null;
   debit: number;
@@ -143,3 +144,35 @@ export interface DashboardMetrics {
   monthReceipts: number;
   monthPayments: number;
 }
+
+export type ReminderType = 'to_collect' | 'to_pay';
+export type ReminderStatus = 'pending' | 'overdue' | 'paid' | 'dismissed';
+export type ReminderPriority = 'low' | 'medium' | 'high' | 'urgent';
+
+export interface PaymentReminder {
+  id: string;
+  company_id: string;
+  party_id?: string | null;
+  party_name?: string;
+  party_phone?: string;
+  phone?: string;
+  invoice_ref?: string;
+  title: string;
+  amount: number;
+  due_date: string;
+  reminder_type: ReminderType; // 'to_collect' (Customer receivable) | 'to_pay' (Vendor payable / bill)
+  status: ReminderStatus;
+  priority?: ReminderPriority;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WhatsAppTemplate {
+  id: string;
+  name: string;
+  type: 'to_collect' | 'to_pay' | 'all';
+  message: string;
+}
+
+

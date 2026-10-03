@@ -1,4 +1,4 @@
-import { Account, Party, Category, Transaction, Company, AuditLog } from '@/types/database';
+import { Account, Party, Category, Transaction, Company, AuditLog, PaymentReminder } from '@/types/database';
 
 export const DEMO_COMPANY: Company = {
   id: 'c1010101-0000-0000-0000-000000000001',
@@ -425,3 +425,68 @@ export const INITIAL_AUDIT_LOGS: AuditLog[] = [
     created_at: '2026-09-04T10:00:00Z',
   },
 ];
+
+export const INITIAL_REMINDERS: PaymentReminder[] = [
+  {
+    id: 'rem-01',
+    company_id: DEMO_COMPANY.id,
+    party_id: 'pty-01',
+    party_name: 'Reliance Digital Retail',
+    party_phone: '+91 98200 11223',
+    title: 'Q3 Enterprise Consulting Milestone Collection',
+    amount: 120000,
+    due_date: '2026-10-15',
+    reminder_type: 'to_collect',
+    status: 'pending',
+    priority: 'high',
+    notes: 'Invoice #INV-2026-891 sent. Payment promised by 15th via RTGS.',
+    created_at: '2026-09-25T10:00:00Z',
+    updated_at: '2026-09-25T10:00:00Z',
+  },
+  {
+    id: 'rem-02',
+    company_id: DEMO_COMPANY.id,
+    party_id: 'pty-03',
+    party_name: 'Godrej Stationery & Tech Supplies',
+    party_phone: '+91 97650 99881',
+    title: 'Annual Printer & Toner Hardware Supply Bill',
+    amount: 45000,
+    due_date: '2026-10-10',
+    reminder_type: 'to_pay',
+    status: 'pending',
+    priority: 'medium',
+    notes: 'Approved by procurement. Settle from ICICI Treasury A/c.',
+    created_at: '2026-09-28T14:30:00Z',
+    updated_at: '2026-09-28T14:30:00Z',
+  },
+  {
+    id: 'rem-03',
+    company_id: DEMO_COMPANY.id,
+    party_id: 'pty-02',
+    party_name: 'Tata Consultancy Services',
+    party_phone: '+91 98210 33445',
+    title: 'Monthly Retainer Cloud Operations Settlement',
+    amount: 340000,
+    due_date: '2026-10-05',
+    reminder_type: 'to_collect',
+    status: 'pending',
+    priority: 'high',
+    notes: 'Follow up with finance desk regarding PO #PO-9921.',
+    created_at: '2026-09-20T09:00:00Z',
+    updated_at: '2026-09-20T09:00:00Z',
+  },
+  {
+    id: 'rem-04',
+    company_id: DEMO_COMPANY.id,
+    title: 'Office Commercial Space Electricity & Utility Bill',
+    amount: 14500,
+    due_date: '2026-10-08',
+    reminder_type: 'to_pay',
+    status: 'pending',
+    priority: 'medium',
+    notes: 'Electricity bill settlement through Net Banking.',
+    created_at: '2026-09-29T11:00:00Z',
+    updated_at: '2026-09-29T11:00:00Z',
+  }
+];
+

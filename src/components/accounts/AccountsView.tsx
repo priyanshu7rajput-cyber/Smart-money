@@ -10,6 +10,7 @@ import { formatCurrency, formatDate, maskAccountNumber } from '@/lib/utils';
 import { Wallet, Landmark, Plus, Search, CheckCircle2, AlertCircle, Edit3, Trash2, PowerOff, History, ArrowDownLeft, ArrowUpRight, Calendar, ExternalLink } from 'lucide-react';
 import { Account, AccountType, BalanceType, Party } from '@/types/database';
 import { PartyStatementModal } from '@/components/accounts/PartyStatementModal';
+import { AccountStatementModal } from '@/components/accounts/AccountStatementModal';
 
 interface AccountsViewProps {
   initialType?: 'all' | 'cash' | 'bank';
@@ -36,6 +37,7 @@ export function AccountsView({ initialType = 'all' }: AccountsViewProps) {
   const [formAccountNumber, setFormAccountNumber] = useState('');
   const [formIfsc, setFormIfsc] = useState('');
   const [formBranch, setFormBranch] = useState('');
+  const [formUpiId, setFormUpiId] = useState('');
   const [formOpeningBalance, setFormOpeningBalance] = useState<string>('0');
   const [formOpeningBalanceType, setFormOpeningBalanceType] = useState<BalanceType>('debit');
   const [formDescription, setFormDescription] = useState('');
@@ -48,6 +50,7 @@ export function AccountsView({ initialType = 'all' }: AccountsViewProps) {
   const [editAccountNumber, setEditAccountNumber] = useState('');
   const [editIfsc, setEditIfsc] = useState('');
   const [editBranch, setEditBranch] = useState('');
+  const [editUpiId, setEditUpiId] = useState('');
   const [editOpeningBalance, setEditOpeningBalance] = useState('0');
   const [editOpeningBalanceType, setEditOpeningBalanceType] = useState<BalanceType>('debit');
   const [editDescription, setEditDescription] = useState('');
@@ -60,7 +63,8 @@ export function AccountsView({ initialType = 'all' }: AccountsViewProps) {
       return (
         acc.name.toLowerCase().includes(q) ||
         (acc.bank_name && acc.bank_name.toLowerCase().includes(q)) ||
-        (acc.account_number && acc.account_number.includes(q))
+        (acc.account_number && acc.account_number.includes(q)) ||
+        (acc.upi_id && acc.upi_id.toLowerCase().includes(q))
       );
     }
     return true;
@@ -94,6 +98,7 @@ export function AccountsView({ initialType = 'all' }: AccountsViewProps) {
       account_number: formType === 'bank' ? formAccountNumber.trim() : undefined,
       ifsc: formType === 'bank' ? formIfsc.trim().toUpperCase() : undefined,
       branch: formType === 'bank' ? formBranch.trim() : undefined,
+      upi_id: formType === 'bank' ? formUpiId.trim() : undefined,
       opening_balance: parsedBal,
       opening_balance_type: formOpeningBalanceType,
       description: formDescription.trim(),
@@ -109,6 +114,7 @@ export function AccountsView({ initialType = 'all' }: AccountsViewProps) {
       setFormAccountNumber('');
       setFormIfsc('');
       setFormBranch('');
+      setFormUpiId('');
       setFormOpeningBalance('0');
       setFormDescription('');
     } else {
@@ -124,6 +130,7 @@ export function AccountsView({ initialType = 'all' }: AccountsViewProps) {
     setEditAccountNumber(acc.account_number || '');
     setEditIfsc(acc.ifsc || '');
     setEditBranch(acc.branch || '');
+    setEditUpiId(acc.upi_id || '');
     setEditOpeningBalance(String(acc.opening_balance || 0));
     setEditOpeningBalanceType(acc.opening_balance_type || 'debit');
     setEditDescription(acc.description || '');
@@ -160,6 +167,7 @@ export function AccountsView({ initialType = 'all' }: AccountsViewProps) {
       account_number: editType === 'bank' ? editAccountNumber.trim() : undefined,
       ifsc: editType === 'bank' ? editIfsc.trim().toUpperCase() : undefined,
       branch: editType === 'bank' ? editBranch.trim() : undefined,
+      upi_id: editType === 'bank' ? editUpiId.trim() : undefined,
       opening_balance: parsedBal,
       opening_balance_type: editOpeningBalanceType,
       description: editDescription.trim(),
@@ -399,265 +407,13 @@ export function AccountsView({ initialType = 'all' }: AccountsViewProps) {
       )}
 
       {/* Account History / Running Ledger Statement Modal */}
-      <Modal
-        isOpen={Boolean(selectedHistoryAccount)}
-        onClose={() => setSelectedHistoryAccount(null)}
-        title={selectedHistoryAccount ? `${selectedHistoryAccount.name} — Statement & Ledger` : 'Account History'}
-        description={selectedHistoryAccount ? `${selectedHistoryAccount.type === 'bank' ? selectedHistoryAccount.bank_name || 'Bank Account' : 'Cash Vault'} • ${selectedHistoryAccount.account_number ? maskAccountNumber(selectedHistoryAccount.account_number) : 'Active Safe'}` : ''}
-        maxWidth="4xl"
-      >
-        {selectedHistoryAccount && (() => {
-          const ledger = getAccountRunningLedger(selectedHistoryAccount.id, fromDate || undefined, toDate || undefined);
-          const liveBal = getAccountBalance(selectedHistoryAccount.id);
-
-          return (
-            <div className="space-y-4">
-              {/* Account Quick Stats Header */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
-                <div className="bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-200/80 dark:border-slate-700/80">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Opening Bal</span>
-                  <span className="text-sm font-mono font-bold text-slate-800 dark:text-slate-200 mt-0.5 block truncate">
-                    {formatCurrency(ledger.openingBalance, currentCompany.currency, currentCompany.currency_symbol)}
-                  </span>
-                </div>
-                <div className="bg-emerald-50/70 dark:bg-emerald-950/30 p-3 rounded-xl border border-emerald-200/60 dark:border-emerald-800/50">
-                  <span className="text-[10px] uppercase font-bold text-emerald-600 dark:text-emerald-400 block tracking-wider flex items-center gap-0.5 truncate">
-                    <ArrowDownLeft className="w-3.5 h-3.5 shrink-0" /> Total Inflow (+)
-                  </span>
-                  <span className="text-sm font-mono font-bold text-emerald-700 dark:text-emerald-300 mt-0.5 block truncate">
-                    {formatCurrency(ledger.totalDebit, currentCompany.currency, currentCompany.currency_symbol)}
-                  </span>
-                </div>
-                <div className="bg-rose-50/70 dark:bg-rose-950/30 p-3 rounded-xl border border-rose-200/60 dark:border-rose-800/50">
-                  <span className="text-[10px] uppercase font-bold text-rose-600 dark:text-rose-400 block tracking-wider flex items-center gap-0.5 truncate">
-                    <ArrowUpRight className="w-3.5 h-3.5 shrink-0" /> Total Outflow (-)
-                  </span>
-                  <span className="text-sm font-mono font-bold text-rose-700 dark:text-rose-300 mt-0.5 block truncate">
-                    {formatCurrency(ledger.totalCredit, currentCompany.currency, currentCompany.currency_symbol)}
-                  </span>
-                </div>
-                <div className="bg-blue-50/70 dark:bg-blue-950/30 p-3 rounded-xl border border-blue-200/60 dark:border-blue-800/50">
-                  <span className="text-[10px] uppercase font-bold text-blue-600 dark:text-blue-400 block tracking-wider">Net Balance</span>
-                  <span className={`text-sm font-mono font-bold mt-0.5 block truncate ${liveBal >= 0 ? 'text-blue-700 dark:text-blue-300' : 'text-rose-600'}`}>
-                    {formatCurrency(liveBal, currentCompany.currency, currentCompany.currency_symbol)}
-                  </span>
-                </div>
-              </div>
-
-              {/* Date Filters */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50 dark:bg-slate-800/40 p-3 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
-                <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                  <span className="font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1 shrink-0">
-                    <Calendar className="w-3.5 h-3.5 text-slate-500" /> Filter Date:
-                  </span>
-                  <div className="flex items-center gap-1.5 flex-1 min-w-[200px]">
-                    <input
-                      type="date"
-                      value={fromDate}
-                      onChange={(e) => setFromDate(e.target.value)}
-                      className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1 text-xs text-slate-800 dark:text-slate-200 flex-1 min-w-0"
-                    />
-                    <span className="text-slate-400 text-xs">to</span>
-                    <input
-                      type="date"
-                      value={toDate}
-                      onChange={(e) => setToDate(e.target.value)}
-                      className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1 text-xs text-slate-800 dark:text-slate-200 flex-1 min-w-0"
-                    />
-                  </div>
-                  {(fromDate || toDate) && (
-                    <button
-                      onClick={() => { setFromDate(''); setToDate(''); }}
-                      className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-semibold"
-                    >
-                      Reset
-                    </button>
-                  )}
-                </div>
-                <div className="text-xs text-slate-500 text-right sm:text-left">
-                  Total Entries: <span className="font-bold text-slate-800 dark:text-slate-200 font-mono">{ledger.entries.length}</span>
-                </div>
-              </div>
-
-              {/* Desktop Table View (>= sm) */}
-              <div className="hidden sm:block border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-2xs">
-                <div className="max-h-[380px] overflow-y-auto">
-                  <table className="w-full text-left text-xs min-w-[700px]">
-                    <thead className="bg-slate-100/90 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold border-b border-slate-200 dark:border-slate-700 sticky top-0 z-10">
-                      <tr>
-                        <th className="px-4 py-3 whitespace-nowrap">Date</th>
-                        <th className="px-4 py-3 whitespace-nowrap">Tx No</th>
-                        <th className="px-4 py-3 whitespace-nowrap">Type</th>
-                        <th className="px-4 py-3">Party / Particulars</th>
-                        <th className="px-4 py-3 text-right whitespace-nowrap text-emerald-600 dark:text-emerald-400">Inflow (+)</th>
-                        <th className="px-4 py-3 text-right whitespace-nowrap text-rose-600 dark:text-rose-400">Outflow (-)</th>
-                        <th className="px-4 py-3 text-right whitespace-nowrap font-bold">Running Balance</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900">
-                      <tr className="bg-slate-50/70 dark:bg-slate-800/40 italic text-slate-600 dark:text-slate-400 font-medium">
-                        <td className="px-4 py-3 text-slate-400 whitespace-nowrap font-mono">{fromDate ? formatDate(fromDate) : 'Start'}</td>
-                        <td className="px-4 py-3 font-mono font-bold text-slate-500">OPENING</td>
-                        <td className="px-4 py-3 font-semibold">—</td>
-                        <td className="px-4 py-3 text-slate-500">Initial Account Balance Brought Forward</td>
-                        <td className="px-4 py-3 text-right font-mono">—</td>
-                        <td className="px-4 py-3 text-right font-mono">—</td>
-                        <td className="px-4 py-3 text-right font-mono font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap">
-                          {formatCurrency(ledger.openingBalance, currentCompany.currency, currentCompany.currency_symbol)}
-                        </td>
-                      </tr>
-
-                      {ledger.entries.length === 0 ? (
-                        <tr>
-                          <td colSpan={7} className="px-4 py-10 text-center text-slate-400 text-xs">
-                            No transactions recorded for this account in the selected period.
-                          </td>
-                        </tr>
-                      ) : (
-                        ledger.entries.map((item, idx) => {
-                          const isReceipt = item.type === 'cash_receipt' || item.type === 'bank_receipt';
-                          const isPayment = item.type === 'cash_payment' || item.type === 'bank_payment';
-
-                          return (
-                            <tr key={item.transactionId || idx} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors">
-                              <td className="px-4 py-3 whitespace-nowrap text-slate-600 dark:text-slate-400 font-mono text-[11px]">
-                                {formatDate(item.date)}
-                              </td>
-                              <td className="px-4 py-3 whitespace-nowrap font-mono font-semibold text-blue-600 dark:text-blue-400">
-                                {item.transactionNo}
-                              </td>
-                              <td className="px-4 py-3 whitespace-nowrap">
-                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
-                                  isReceipt 
-                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300' 
-                                    : isPayment
-                                    ? 'bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/60 dark:text-rose-300'
-                                    : 'bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-950/60 dark:text-indigo-300'
-                                }`}>
-                                  {item.type.replace('_', ' ')}
-                                </span>
-                              </td>
-                              <td className="px-4 py-3 max-w-[240px]">
-                                {item.partyName ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      const p = parties.find(party => party.name.toLowerCase() === (item.partyName || '').toLowerCase());
-                                      if (p) setViewedParty(p);
-                                    }}
-                                    className="font-semibold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 text-left truncate cursor-pointer group"
-                                    title={`View statement for ${item.partyName}`}
-                                  >
-                                    <span className="truncate">{item.partyName}</span>
-                                    <ExternalLink className="w-3 h-3 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                  </button>
-                                ) : (
-                                  <span className="text-slate-400 italic">—</span>
-                                )}
-                                <div className="text-[11px] text-slate-500 truncate mt-0.5" title={item.description || item.reference}>
-                                  {item.description || item.reference || 'No narration'}
-                                </div>
-                              </td>
-                              <td className="px-4 py-3 text-right font-mono font-semibold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
-                                {item.debit > 0 ? `+${formatCurrency(item.debit, currentCompany.currency, currentCompany.currency_symbol)}` : '—'}
-                              </td>
-                              <td className="px-4 py-3 text-right font-mono font-semibold text-rose-600 dark:text-rose-400 whitespace-nowrap">
-                                {item.credit > 0 ? `-${formatCurrency(item.credit, currentCompany.currency, currentCompany.currency_symbol)}` : '—'}
-                              </td>
-                              <td className="px-4 py-3 text-right font-mono font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap">
-                                {formatCurrency(item.balance, currentCompany.currency, currentCompany.currency_symbol)}
-                              </td>
-                            </tr>
-                          );
-                        })
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Mobile Card List View (< sm) */}
-              <div className="sm:hidden space-y-2 max-h-[360px] overflow-y-auto pr-0.5">
-                <div className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/80 flex justify-between items-center text-xs">
-                  <div>
-                    <span className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-[10px] font-bold text-slate-600 dark:text-slate-300">
-                      OPENING
-                    </span>
-                    <p className="text-[11px] text-slate-500 mt-1">Starting Balance</p>
-                  </div>
-                  <span className="font-mono font-bold text-slate-800 dark:text-slate-200">
-                    {formatCurrency(ledger.openingBalance, currentCompany.currency, currentCompany.currency_symbol)}
-                  </span>
-                </div>
-
-                {ledger.entries.length === 0 ? (
-                  <div className="p-6 text-center text-slate-400 text-xs">
-                    No transactions recorded for this period.
-                  </div>
-                ) : (
-                  ledger.entries.map((item, idx) => {
-                    const isReceipt = item.type === 'cash_receipt' || item.type === 'bank_receipt';
-                    const isPayment = item.type === 'cash_payment' || item.type === 'bank_payment';
-
-                    return (
-                      <div key={item.transactionId || idx} className="p-2.5 rounded-lg bg-white dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 space-y-1.5 shadow-2xs">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <span className="font-mono font-semibold text-xs text-blue-600 dark:text-blue-400 block">
-                              {item.transactionNo}
-                            </span>
-                            <span className="text-[10px] text-slate-400 font-mono">
-                              {item.date}
-                            </span>
-                          </div>
-                          <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${
-                            isReceipt 
-                              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' 
-                              : isPayment
-                              ? 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'
-                              : 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300'
-                          }`}>
-                            {item.type.replace('_', ' ')}
-                          </span>
-                        </div>
-
-                        <div className="flex justify-between items-center text-xs pt-1 border-t border-slate-100 dark:border-slate-700/60">
-                          <span className="font-medium text-slate-700 dark:text-slate-200 truncate max-w-[150px]">
-                            {item.partyName || item.description || 'Transaction'}
-                          </span>
-                          {item.debit > 0 ? (
-                            <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-xs">
-                              +{formatCurrency(item.debit, currentCompany.currency, currentCompany.currency_symbol)}
-                            </span>
-                          ) : (
-                            <span className="font-mono font-bold text-rose-600 dark:text-rose-400 text-xs">
-                              -{formatCurrency(item.credit, currentCompany.currency, currentCompany.currency_symbol)}
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="flex justify-between items-center text-[11px] pt-1 text-slate-500">
-                          <span>Balance:</span>
-                          <span className="font-mono font-bold text-slate-800 dark:text-slate-200">
-                            {formatCurrency(item.balance, currentCompany.currency, currentCompany.currency_symbol)}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-
-              {/* Modal Actions */}
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-                <Button type="button" variant="outline" size="sm" onClick={() => setSelectedHistoryAccount(null)} className="w-full sm:w-auto justify-center">
-                  Close
-                </Button>
-              </div>
-            </div>
-          );
-        })()}
-      </Modal>
+      {selectedHistoryAccount && (
+        <AccountStatementModal
+          account={selectedHistoryAccount}
+          isOpen={Boolean(selectedHistoryAccount)}
+          onClose={() => setSelectedHistoryAccount(null)}
+        />
+      )}
 
       {/* Add Account Modal */}
       <Modal
@@ -721,6 +477,17 @@ export function AccountsView({ initialType = 'all' }: AccountsViewProps) {
                   value={formBranch}
                   onChange={(e) => setFormBranch(e.target.value)}
                 />
+              </div>
+              <div>
+                <Input
+                  label="UPI ID / VPA (for QR Code Generation)"
+                  placeholder="e.g. business@hdfcbank or 9876543210@upi"
+                  value={formUpiId}
+                  onChange={(e) => setFormUpiId(e.target.value)}
+                />
+                <p className="text-[10px] text-slate-400 mt-1">
+                  💡 This UPI ID will appear as a 1-click option when generating reminder QR codes.
+                </p>
               </div>
             </div>
           )}
@@ -830,6 +597,14 @@ export function AccountsView({ initialType = 'all' }: AccountsViewProps) {
                     placeholder="e.g. Nariman Point, Mumbai"
                     value={editBranch}
                     onChange={(e) => setEditBranch(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Input
+                    label="UPI ID / VPA (for QR Code Generation)"
+                    placeholder="e.g. business@hdfcbank or 9876543210@upi"
+                    value={editUpiId}
+                    onChange={(e) => setEditUpiId(e.target.value)}
                   />
                 </div>
               </div>

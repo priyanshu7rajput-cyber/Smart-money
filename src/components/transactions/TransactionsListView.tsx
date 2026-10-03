@@ -24,14 +24,31 @@ import {
   AlertCircle,
   Download,
   Users,
-  Tags
+  Tags,
+  RotateCcw,
+  Undo2,
+  RefreshCw,
+  ArchiveRestore
 } from 'lucide-react';
 import { Transaction, TransactionType } from '@/types/database';
 import * as XLSX from 'xlsx';
 
 export function TransactionsListView() {
-  const { transactions, accounts, parties, categories, currentCompany, voidTransaction, deleteTransaction, editTransaction } = useApp();
+  const { 
+    transactions, 
+    deletedTransactions, 
+    accounts, 
+    parties, 
+    categories, 
+    currentCompany, 
+    voidTransaction, 
+    deleteTransaction, 
+    recoverTransaction, 
+    permanentlyDeleteTransaction,
+    editTransaction 
+  } = useApp();
 
+  const [activeViewTab, setActiveViewTab] = useState<'all' | 'deleted'>('all');
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [accountFilter, setAccountFilter] = useState<string>('all');
@@ -61,8 +78,10 @@ export function TransactionsListView() {
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Filter logic - with newest entries first
+  const activeDataset = activeViewTab === 'deleted' ? deletedTransactions : transactions;
+
   const filteredTransactions = useMemo(() => {
-    return transactions
+    return activeDataset
       .filter(tx => {
         if (typeFilter !== 'all' && tx.transaction_type !== typeFilter) return false;
         if (statusFilter !== 'all' && tx.status !== statusFilter) return false;
@@ -98,7 +117,7 @@ export function TransactionsListView() {
         }
         return b.transaction_no.localeCompare(a.transaction_no);
       });
-  }, [transactions, typeFilter, statusFilter, accountFilter, fromDate, toDate, search, parties, categories]);
+  }, [activeDataset, typeFilter, statusFilter, accountFilter, fromDate, toDate, search, parties, categories]);
 
   const totalPages = Math.ceil(filteredTransactions.length / pageSize) || 1;
   const paginatedTransactions = filteredTransactions.slice((page - 1) * pageSize, page * pageSize);
@@ -141,11 +160,29 @@ export function TransactionsListView() {
 
     const res = deleteTransaction(selectedTx.id);
     if (res.success) {
-      setNotification({ type: 'success', message: `Transaction ${selectedTx.transaction_no} has been permanently deleted.` });
+      setNotification({ type: 'success', message: `Transaction ${selectedTx.transaction_no} moved to Recently Deleted (can be recovered anytime).` });
       setIsDeleteOpen(false);
       setIsDetailOpen(false);
     } else {
       setNotification({ type: 'error', message: res.error || 'Failed to delete transaction.' });
+    }
+  };
+
+  const handleRecover = (tx: Transaction) => {
+    const res = recoverTransaction(tx.id);
+    if (res.success) {
+      setNotification({ type: 'success', message: `Transaction ${tx.transaction_no} has been successfully recovered and restored!` });
+      setIsDetailOpen(false);
+    } else {
+      setNotification({ type: 'error', message: res.error || 'Failed to recover transaction.' });
+    }
+  };
+
+  const handlePermanentDelete = (tx: Transaction) => {
+    if (confirm(`Are you sure you want to permanently purge ${tx.transaction_no}? This cannot be undone.`)) {
+      permanentlyDeleteTransaction(tx.id);
+      setNotification({ type: 'success', message: `Transaction ${tx.transaction_no} permanently purged.` });
+      setIsDetailOpen(false);
     }
   };
 
@@ -252,7 +289,7 @@ export function TransactionsListView() {
             Transaction Register
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Audit trail of all receipts, payments, and contra entries
+            Audit trail of all active receipts, payments, contra transfers & recently deleted items
           </p>
         </div>
 
@@ -271,6 +308,57 @@ export function TransactionsListView() {
             </Button>
           </Link>
         </div>
+      </div>
+
+      {/* Main View Mode Tabs (Active Transactions vs Recently Deleted Recycle Bin) */}
+      <div className="flex items-center justify-between gap-3 bg-white dark:bg-slate-900 p-2.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              setActiveViewTab('all');
+              setPage(1);
+            }}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+              activeViewTab === 'all'
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+            }`}
+          >
+            <span>All Active Transactions</span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+              activeViewTab === 'all' ? 'bg-blue-700 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
+            }`}>
+              {transactions.length}
+            </span>
+          </button>
+
+          <button
+            onClick={() => {
+              setActiveViewTab('deleted');
+              setPage(1);
+            }}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+              activeViewTab === 'deleted'
+                ? 'bg-rose-600 text-white shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+            }`}
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>Recently Deleted</span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+              activeViewTab === 'deleted' ? 'bg-rose-700 text-white' : 'bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300'
+            }`}>
+              {deletedTransactions.length}
+            </span>
+          </button>
+        </div>
+
+        {activeViewTab === 'deleted' && deletedTransactions.length > 0 && (
+          <span className="text-xs text-amber-600 dark:text-amber-400 font-medium hidden md:inline-flex items-center gap-1.5">
+            <ArchiveRestore className="w-4 h-4" />
+            <span>Click &quot;Recover&quot; on any entry to instantly restore it to your active register</span>
+          </span>
+        )}
       </div>
 
       {/* Filter Toolbar */}
@@ -500,38 +588,61 @@ export function TransactionsListView() {
                           )}
                         </td>
                         <td className="px-4 py-3 text-right whitespace-nowrap space-x-1">
-                          <button
-                            onClick={() => openDetail(tx)}
-                            className="p-1 text-blue-600 hover:text-blue-800 dark:text-blue-400 rounded hover:bg-blue-50 dark:hover:bg-blue-900/30 cursor-pointer"
-                            title="View Ledger Breakdown"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                          {!isVoided && (
+                          {activeViewTab === 'deleted' ? (
+                            <>
+                              <Button
+                                size="sm"
+                                onClick={() => handleRecover(tx)}
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs py-1 px-2.5 gap-1.5 shadow-2xs cursor-pointer inline-flex items-center"
+                                title="Recover & Restore Transaction"
+                              >
+                                <RotateCcw className="w-3.5 h-3.5" />
+                                <span>Recover</span>
+                              </Button>
+                              <button
+                                onClick={() => handlePermanentDelete(tx)}
+                                className="p-1 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 rounded hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer"
+                                title="Permanently Delete"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </>
+                          ) : (
                             <>
                               <button
-                                onClick={() => openEditDialog(tx)}
-                                className="p-1 text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 rounded hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
-                                title="Edit Transaction & Account"
+                                onClick={() => openDetail(tx)}
+                                className="p-1 text-blue-600 hover:text-blue-800 dark:text-blue-400 rounded hover:bg-blue-50 dark:hover:bg-blue-900/30 cursor-pointer"
+                                title="View Ledger Breakdown"
                               >
-                                <Edit3 className="w-4 h-4" />
+                                <Eye className="w-4 h-4" />
                               </button>
+                              {!isVoided && (
+                                <>
+                                  <button
+                                    onClick={() => openEditDialog(tx)}
+                                    className="p-1 text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 rounded hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                                    title="Edit Transaction & Account"
+                                  >
+                                    <Edit3 className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => openVoidDialog(tx)}
+                                    className="p-1 text-amber-500 hover:text-amber-700 rounded hover:bg-amber-50 dark:hover:bg-amber-900/30 cursor-pointer"
+                                    title="Void Financial Transaction"
+                                  >
+                                    <Ban className="w-4 h-4" />
+                                  </button>
+                                </>
+                              )}
                               <button
-                                onClick={() => openVoidDialog(tx)}
-                                className="p-1 text-amber-500 hover:text-amber-700 rounded hover:bg-amber-50 dark:hover:bg-amber-900/30 cursor-pointer"
-                                title="Void Financial Transaction"
+                                onClick={() => openDeleteDialog(tx)}
+                                className="p-1 text-rose-500 hover:text-rose-700 rounded hover:bg-rose-50 dark:hover:bg-rose-900/30 cursor-pointer"
+                                title="Delete Transaction"
                               >
-                                <Ban className="w-4 h-4" />
+                                <Trash2 className="w-4 h-4" />
                               </button>
                             </>
                           )}
-                          <button
-                            onClick={() => openDeleteDialog(tx)}
-                            className="p-1 text-rose-500 hover:text-rose-700 rounded hover:bg-rose-50 dark:hover:bg-rose-900/30 cursor-pointer"
-                            title="Delete Transaction"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
                         </td>
                       </tr>
                     );
@@ -650,47 +761,71 @@ export function TransactionsListView() {
                       )}
                     </div>
 
-                    <div className="flex items-center justify-end gap-1 pt-1">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => openDetail(tx)}
-                        className="text-xs py-1 px-2.5 gap-1 text-blue-600 dark:text-blue-400"
-                      >
-                        <Eye className="w-3.5 h-3.5" />
-                        <span>Details</span>
-                      </Button>
-                      {!isVoided && (
+                    <div className="flex items-center justify-end gap-1.5 pt-1">
+                      {activeViewTab === 'deleted' ? (
+                        <>
+                          <Button
+                            size="sm"
+                            onClick={() => handleRecover(tx)}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs py-1 px-3 gap-1 shadow-2xs cursor-pointer inline-flex items-center"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                            <span>Recover</span>
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handlePermanentDelete(tx)}
+                            className="text-xs py-1 px-2.5 gap-1 text-rose-600 hover:text-rose-700"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Purge</span>
+                          </Button>
+                        </>
+                      ) : (
                         <>
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => openEditDialog(tx)}
-                            className="text-xs py-1 px-2.5 gap-1 text-slate-700 dark:text-slate-300"
+                            onClick={() => openDetail(tx)}
+                            className="text-xs py-1 px-2.5 gap-1 text-blue-600 dark:text-blue-400"
                           >
-                            <Edit3 className="w-3.5 h-3.5" />
-                            <span>Edit</span>
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>Details</span>
                           </Button>
+                          {!isVoided && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => openEditDialog(tx)}
+                                className="text-xs py-1 px-2.5 gap-1 text-slate-700 dark:text-slate-300"
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                                <span>Edit</span>
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => openVoidDialog(tx)}
+                                className="text-xs py-1 px-2.5 gap-1 text-amber-600 hover:text-amber-700"
+                              >
+                                <Ban className="w-3.5 h-3.5" />
+                                <span>Void</span>
+                              </Button>
+                            </>
+                          )}
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => openVoidDialog(tx)}
-                            className="text-xs py-1 px-2.5 gap-1 text-amber-600 hover:text-amber-700"
+                            onClick={() => openDeleteDialog(tx)}
+                            className="text-xs py-1 px-2.5 gap-1 text-rose-600 hover:text-rose-700"
                           >
-                            <Ban className="w-3.5 h-3.5" />
-                            <span>Void</span>
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Delete</span>
                           </Button>
                         </>
                       )}
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => openDeleteDialog(tx)}
-                        className="text-xs py-1 px-2.5 gap-1 text-rose-600 hover:text-rose-700"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        <span>Delete</span>
-                      </Button>
                     </div>
                   </div>
                 );
@@ -813,32 +948,58 @@ export function TransactionsListView() {
 
             <div className="flex justify-between pt-3 border-t border-slate-100 dark:border-slate-800">
               <div className="flex gap-2">
-                {selectedTx.status === 'active' && (
+                {activeViewTab === 'deleted' ? (
                   <>
                     <Button 
-                      variant="outline" 
+                      variant="primary" 
                       size="sm"
-                      onClick={() => openEditDialog(selectedTx)}
+                      onClick={() => {
+                        handleRecover(selectedTx);
+                        setIsDetailOpen(false);
+                      }}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5"
                     >
-                      Edit Narration / Date
+                      <RotateCcw className="w-4 h-4" />
+                      Recover Transaction
                     </Button>
                     <Button 
-                      variant="outline" 
+                      variant="danger" 
                       size="sm" 
-                      onClick={() => openVoidDialog(selectedTx)}
-                      className="text-amber-600 border-amber-300 hover:bg-amber-50"
+                      onClick={() => openDeleteDialog(selectedTx)}
                     >
-                      Void Transaction
+                      Permanently Purge
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    {selectedTx.status === 'active' && (
+                      <>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => openEditDialog(selectedTx)}
+                        >
+                          Edit Narration / Date
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => openVoidDialog(selectedTx)}
+                          className="text-amber-600 border-amber-300 hover:bg-amber-50"
+                        >
+                          Void Transaction
+                        </Button>
+                      </>
+                    )}
+                    <Button 
+                      variant="danger" 
+                      size="sm" 
+                      onClick={() => openDeleteDialog(selectedTx)}
+                    >
+                      Delete Entry
                     </Button>
                   </>
                 )}
-                <Button 
-                  variant="danger" 
-                  size="sm" 
-                  onClick={() => openDeleteDialog(selectedTx)}
-                >
-                  Delete Entry
-                </Button>
               </div>
               <Button variant="secondary" size="sm" onClick={() => setIsDetailOpen(false)}>
                 Close

@@ -42,6 +42,7 @@ export function Sidebar() {
       group: 'Transactions',
       items: [
         { label: 'All Transactions', href: '/transactions', icon: ArrowLeftRight },
+        { label: 'Payment Reminders', href: '/reminders', icon: ReceiptText },
         { label: 'Cash Receipt', href: '/transactions/cash-receipt', icon: ArrowDownLeft },
         { label: 'Cash Payment', href: '/transactions/cash-payment', icon: ArrowUpRight },
         { label: 'Bank Receipt', href: '/transactions/bank-receipt', icon: ArrowDownLeft },

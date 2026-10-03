@@ -18,7 +18,8 @@ import {
   Eye,
   CheckCircle2,
   Ban,
-  Clock
+  Clock,
+  BellRing
 } from 'lucide-react';
 import { MonthlySavingsVsSpendingChart } from '@/components/dashboard/MonthlySavingsVsSpendingChart';
 import { TreasuryRedistributionFlowChart } from '@/components/dashboard/TreasuryRedistributionFlowChart';
@@ -140,58 +141,73 @@ export function DashboardView() {
       {/* 7 Key Financial Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Cash Balance */}
-        <Card className="border-l-4 border-l-emerald-500 hover:shadow-md transition-shadow">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Cash</span>
-              <div className="p-2 rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40">
-                <Wallet className="w-4 h-4" />
+        <Link href="/accounts/cash" className="block group focus:outline-none">
+          <Card className="border-l-4 border-l-emerald-500 group-hover:shadow-lg group-hover:-translate-y-0.5 transition-all duration-200 cursor-pointer h-full">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+                  Total Cash
+                </span>
+                <div className="p-2 rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 group-hover:scale-110 transition-transform">
+                  <Wallet className="w-4 h-4" />
+                </div>
               </div>
-            </div>
-            <div className="mt-2 text-xl font-bold text-slate-900 dark:text-slate-100">
-              {formatCurrency(metrics.totalCashBalance, currentCompany.currency, currentCompany.currency_symbol)}
-            </div>
-            <p className="text-[11px] text-slate-500 mt-1">
-              Active cash registers & petty cash
-            </p>
-          </CardContent>
-        </Card>
+              <div className="mt-2 text-xl font-bold text-slate-900 dark:text-slate-100">
+                {formatCurrency(metrics.totalCashBalance, currentCompany.currency, currentCompany.currency_symbol)}
+              </div>
+              <p className="text-[11px] text-slate-500 mt-1 flex items-center justify-between">
+                <span>Active cash registers & petty cash</span>
+                <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold opacity-0 group-hover:opacity-100 transition-opacity">View &rarr;</span>
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
 
         {/* Total Bank Balance */}
-        <Card className="border-l-4 border-l-blue-500 hover:shadow-md transition-shadow">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Bank</span>
-              <div className="p-2 rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-950/40">
-                <Landmark className="w-4 h-4" />
+        <Link href="/accounts/bank" className="block group focus:outline-none">
+          <Card className="border-l-4 border-l-blue-500 group-hover:shadow-lg group-hover:-translate-y-0.5 transition-all duration-200 cursor-pointer h-full">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                  Total Bank
+                </span>
+                <div className="p-2 rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-950/40 group-hover:scale-110 transition-transform">
+                  <Landmark className="w-4 h-4" />
+                </div>
               </div>
-            </div>
-            <div className="mt-2 text-xl font-bold text-slate-900 dark:text-slate-100">
-              {formatCurrency(metrics.totalBankBalance, currentCompany.currency, currentCompany.currency_symbol)}
-            </div>
-            <p className="text-[11px] text-slate-500 mt-1">
-              Across all institutional bank accounts
-            </p>
-          </CardContent>
-        </Card>
+              <div className="mt-2 text-xl font-bold text-slate-900 dark:text-slate-100">
+                {formatCurrency(metrics.totalBankBalance, currentCompany.currency, currentCompany.currency_symbol)}
+              </div>
+              <p className="text-[11px] text-slate-500 mt-1 flex items-center justify-between">
+                <span>Across all institutional bank accounts</span>
+                <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold opacity-0 group-hover:opacity-100 transition-opacity">View &rarr;</span>
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
 
         {/* Net Liquidity Balance */}
-        <Card className="border-l-4 border-l-indigo-600 hover:shadow-md transition-shadow">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Net Liquidity</span>
-              <div className="p-2 rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40">
-                <CircleDollarSign className="w-4 h-4" />
+        <Link href="/accounts" className="block group focus:outline-none">
+          <Card className="border-l-4 border-l-indigo-600 group-hover:shadow-lg group-hover:-translate-y-0.5 transition-all duration-200 cursor-pointer h-full">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                  Net Liquidity
+                </span>
+                <div className="p-2 rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 group-hover:scale-110 transition-transform">
+                  <CircleDollarSign className="w-4 h-4" />
+                </div>
               </div>
-            </div>
-            <div className="mt-2 text-xl font-bold text-slate-900 dark:text-slate-100">
-              {formatCurrency(metrics.totalBalance, currentCompany.currency, currentCompany.currency_symbol)}
-            </div>
-            <p className="text-[11px] text-slate-500 mt-1">
-              Cash + Bank liquid reserves
-            </p>
-          </CardContent>
-        </Card>
+              <div className="mt-2 text-xl font-bold text-slate-900 dark:text-slate-100">
+                {formatCurrency(metrics.totalBalance, currentCompany.currency, currentCompany.currency_symbol)}
+              </div>
+              <p className="text-[11px] text-slate-500 mt-1 flex items-center justify-between">
+                <span>Cash + Bank liquid reserves</span>
+                <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold opacity-0 group-hover:opacity-100 transition-opacity">Manage &rarr;</span>
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
 
         {/* Today's Inflow / Outflow */}
         <Card className="hover:shadow-md transition-shadow">
@@ -255,6 +271,32 @@ export function DashboardView() {
             <span className="text-xs text-rose-700 font-semibold hover:underline">Details &rarr;</span>
           </Link>
         </div>
+      </div>
+
+      {/* Payment Reminders Quick Action Banner */}
+      <div className="bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border border-amber-500/30 dark:border-amber-500/20 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+            <BellRing className="w-5 h-5" />
+          </div>
+          <div>
+            <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+              <span>Payment Reminders & WhatsApp Follow-ups</span>
+              <span className="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-300">
+                New
+              </span>
+            </h4>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+              Keep track of customer receivables, schedule vendor payments, and generate 1-click WhatsApp alerts.
+            </p>
+          </div>
+        </div>
+        <Link href="/reminders">
+          <Button size="sm" variant="outline" className="text-xs gap-1.5 whitespace-nowrap border-amber-300 dark:border-amber-700/60 hover:bg-amber-50 dark:hover:bg-amber-950/40 cursor-pointer">
+            <span>Open Reminders</span>
+            <span>&rarr;</span>
+          </Button>
+        </Link>
       </div>
 
       {/* Primary Hero Chart: Monthly Savings VS Spending */}
