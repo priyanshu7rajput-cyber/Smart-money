@@ -500,6 +500,36 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setAuditLogs(loadedLogs);
         localStorage.setItem(`cashflow_${user.id}_audit_logs`, JSON.stringify(loadedLogs));
       }
+
+      // 7. Fetch Payment Reminders
+      const { data: dbReminders } = await supabase
+        .from('reminders')
+        .select('*')
+        .eq('company_id', companyId)
+        .order('due_date', { ascending: true });
+
+      if (dbReminders) {
+        const loadedReminders = dbReminders.map((r: any) => ({
+          id: r.id,
+          company_id: r.company_id,
+          party_id: r.party_id || null,
+          party_name: r.party_name || '',
+          party_phone: r.party_phone || '',
+          phone: r.phone || '',
+          invoice_ref: r.invoice_ref || '',
+          title: r.title || '',
+          amount: Number(r.amount) || 0,
+          due_date: r.due_date || new Date().toISOString().split('T')[0],
+          reminder_type: r.reminder_type || 'to_collect',
+          status: r.status || 'pending',
+          priority: r.priority || 'medium',
+          notes: r.notes || '',
+          created_at: r.created_at,
+          updated_at: r.updated_at,
+        }));
+        setReminders(loadedReminders);
+        localStorage.setItem(`cashflow_${user.id}_reminders`, JSON.stringify(loadedReminders));
+      }
     } catch (err) {
       console.error('Failed to sync Supabase user data:', err);
     }
@@ -671,6 +701,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         syncSupabaseUserData(currentUser);
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, () => {
+        syncSupabaseUserData(currentUser);
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'reminders' }, () => {
         syncSupabaseUserData(currentUser);
       })
       .subscribe();
@@ -1106,6 +1139,36 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     setReminders(prev => [newReminder, ...prev]);
 
+    if (isSupabaseConfigured && currentUser && currentUser.id !== 'usr-admin-01') {
+      (async () => {
+        try {
+          const supabase = createClient();
+          await ensureCompanyExistsInDb(supabase, currentCompany.id, currentCompany.name, currentUser.id);
+          const { error } = await supabase.from('reminders').insert({
+            id: newId,
+            company_id: currentCompany.id,
+            party_id: reminderData.party_id || null,
+            party_name: reminderData.party_name || null,
+            party_phone: reminderData.party_phone || null,
+            phone: reminderData.phone || null,
+            invoice_ref: reminderData.invoice_ref || null,
+            title: reminderData.title,
+            amount: reminderData.amount || 0,
+            due_date: reminderData.due_date,
+            reminder_type: reminderData.reminder_type || 'to_collect',
+            status: reminderData.status || 'pending',
+            priority: reminderData.priority || 'medium',
+            notes: reminderData.notes || null,
+          });
+          if (error) {
+            console.error('Supabase error on addPaymentReminder:', error.message, error.details, error.hint, error.code);
+          }
+        } catch (err: any) {
+          console.error('Failed to insert reminder in Supabase:', err?.message || err);
+        }
+      })();
+    }
+
     const log: AuditLog = {
       id: generateUUID(),
       company_id: currentCompany.id,
@@ -1123,6 +1186,37 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const updatePaymentReminder = (id: string, updates: Partial<PaymentReminder>) => {
     setReminders(prev => prev.map(r => r.id === id ? { ...r, ...updates, updated_at: new Date().toISOString() } : r));
 
+    if (isSupabaseConfigured && currentUser && currentUser.id !== 'usr-admin-01') {
+      (async () => {
+        try {
+          const supabase = createClient();
+          await ensureCompanyExistsInDb(supabase, currentCompany.id, currentCompany.name, currentUser.id);
+          const dbPayload: any = {
+            updated_at: new Date().toISOString(),
+          };
+          if (updates.party_id !== undefined) dbPayload.party_id = updates.party_id || null;
+          if (updates.party_name !== undefined) dbPayload.party_name = updates.party_name || null;
+          if (updates.party_phone !== undefined) dbPayload.party_phone = updates.party_phone || null;
+          if (updates.phone !== undefined) dbPayload.phone = updates.phone || null;
+          if (updates.invoice_ref !== undefined) dbPayload.invoice_ref = updates.invoice_ref || null;
+          if (updates.title !== undefined) dbPayload.title = updates.title;
+          if (updates.amount !== undefined) dbPayload.amount = updates.amount;
+          if (updates.due_date !== undefined) dbPayload.due_date = updates.due_date;
+          if (updates.reminder_type !== undefined) dbPayload.reminder_type = updates.reminder_type;
+          if (updates.status !== undefined) dbPayload.status = updates.status;
+          if (updates.priority !== undefined) dbPayload.priority = updates.priority;
+          if (updates.notes !== undefined) dbPayload.notes = updates.notes || null;
+
+          const { error } = await supabase.from('reminders').update(dbPayload).eq('id', id);
+          if (error) {
+            console.error('Supabase error on updatePaymentReminder:', error.message, error.details, error.hint, error.code);
+          }
+        } catch (err: any) {
+          console.error('Failed to update reminder in Supabase:', err?.message || err);
+        }
+      })();
+    }
+
     const log: AuditLog = {
       id: generateUUID(),
       company_id: currentCompany.id,
@@ -1139,6 +1233,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const deletePaymentReminder = (id: string) => {
     setReminders(prev => prev.filter(r => r.id !== id));
+
+    if (isSupabaseConfigured && currentUser && currentUser.id !== 'usr-admin-01') {
+      (async () => {
+        try {
+          const supabase = createClient();
+          const { error } = await supabase.from('reminders').delete().eq('id', id);
+          if (error) {
+            console.error('Supabase error on deletePaymentReminder:', error.message, error.details, error.hint, error.code);
+          }
+        } catch (err: any) {
+          console.error('Failed to delete reminder in Supabase:', err?.message || err);
+        }
+      })();
+    }
 
     const log: AuditLog = {
       id: generateUUID(),

@@ -202,11 +202,32 @@ CREATE TABLE IF NOT EXISTS public.audit_logs (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- 12b. PAYMENT REMINDERS
+CREATE TABLE IF NOT EXISTS public.reminders (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    company_id UUID NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
+    party_id UUID REFERENCES public.parties(id) ON DELETE SET NULL,
+    party_name VARCHAR(255),
+    party_phone VARCHAR(50),
+    phone VARCHAR(50),
+    invoice_ref VARCHAR(100),
+    title VARCHAR(255) NOT NULL,
+    amount NUMERIC(15,2) NOT NULL DEFAULT 0.00,
+    due_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    reminder_type VARCHAR(50) NOT NULL DEFAULT 'to_collect',
+    status VARCHAR(50) NOT NULL DEFAULT 'pending',
+    priority VARCHAR(50) NOT NULL DEFAULT 'medium',
+    notes TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- 13. INDEXES
 CREATE INDEX IF NOT EXISTS idx_company_users_user ON public.company_users(user_id);
 CREATE INDEX IF NOT EXISTS idx_accounts_company ON public.accounts(company_id, status);
 CREATE INDEX IF NOT EXISTS idx_parties_company ON public.parties(company_id, status);
 CREATE INDEX IF NOT EXISTS idx_categories_company ON public.categories(company_id, type, status);
+CREATE INDEX IF NOT EXISTS idx_reminders_company ON public.reminders(company_id, due_date, status);
 
 CREATE INDEX IF NOT EXISTS idx_transactions_company_date ON public.transactions(company_id, transaction_date DESC);
 CREATE INDEX IF NOT EXISTS idx_transactions_type ON public.transactions(company_id, transaction_type);
@@ -570,6 +591,7 @@ ALTER TABLE public.transactions DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.transaction_entries DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.attachments DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.audit_logs DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.reminders DISABLE ROW LEVEL SECURITY;
 
 -- 16. DROP ANY RESTRICTIVE POLICIES
 DROP POLICY IF EXISTS company_access ON public.companies;
@@ -602,6 +624,9 @@ DROP POLICY IF EXISTS attachments_authenticated_all ON public.attachments;
 
 DROP POLICY IF EXISTS audit_logs_access ON public.audit_logs;
 DROP POLICY IF EXISTS audit_logs_authenticated_all ON public.audit_logs;
+
+DROP POLICY IF EXISTS reminders_access ON public.reminders;
+DROP POLICY IF EXISTS reminders_authenticated_all ON public.reminders;
 
 
 

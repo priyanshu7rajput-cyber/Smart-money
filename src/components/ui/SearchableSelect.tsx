@@ -154,7 +154,7 @@ export function SearchableSelect({
           </div>
 
           {/* Options List */}
-          <div className="max-h-56 overflow-y-auto p-1 text-xs">
+          <div className="max-h-56 overflow-y-auto overscroll-contain p-1 text-xs touch-pan-y" style={{ WebkitOverflowScrolling: 'touch' }}>
             {/* Direct / Walk-in Option */}
             <div
               onClick={() => handleSelect('')}
