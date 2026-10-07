@@ -88,6 +88,7 @@ CREATE TABLE IF NOT EXISTS public.accounts (
     account_number VARCHAR(100),
     ifsc VARCHAR(50),
     branch VARCHAR(100),
+    upi_id VARCHAR(100),
     opening_balance NUMERIC(15,2) NOT NULL DEFAULT 0.00,
     opening_balance_type balance_type_enum NOT NULL DEFAULT 'debit',
     description TEXT,
