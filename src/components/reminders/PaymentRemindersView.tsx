@@ -44,6 +44,7 @@ import {
 } from 'lucide-react';
 import { MonthlyReminderCashflowChart } from '@/components/reminders/MonthlyReminderCashflowChart';
 import { ReminderImageModal, CARD_TEMPLATES } from '@/components/reminders/ReminderImageModal';
+import { TemplatePickerModal } from '@/components/reminders/TemplatePickerModal';
 
 const DEFAULT_TEMPLATES: WhatsAppTemplate[] = [
   {
@@ -136,14 +137,33 @@ export function PaymentRemindersView() {
   const [customMessage, setCustomMessage] = useState('');
   const [isCopied, setIsCopied] = useState(false);
 
-  // Visual Image Card Template Modal State
+  // Visual Image Card Template Modal & Studio State
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const [imageModalReminder, setImageModalReminder] = useState<PaymentReminder | null>(null);
   const [selectedImageTemplateId, setSelectedImageTemplateId] = useState<string | null>(null);
+  const [imageModalTab, setImageModalTab] = useState<'templates' | 'design' | 'elements' | 'presets'>('templates');
+  const [autoSendWhatsAppImage, setAutoSendWhatsAppImage] = useState(false);
 
-  const handleOpenImageModal = (reminder: PaymentReminder, tplId?: string) => {
+  // Quick Template Selection Prompt Modal State
+  const [isTemplatePickerOpen, setIsTemplatePickerOpen] = useState(false);
+  const [templatePickerReminder, setTemplatePickerReminder] = useState<PaymentReminder | null>(null);
+
+  // When clicking Card Image button on reminder, ask which template to use first!
+  const handleCardImageButtonClick = (reminder: PaymentReminder) => {
+    setTemplatePickerReminder(reminder);
+    setIsTemplatePickerOpen(true);
+  };
+
+  const handleOpenImageModal = (
+    reminder: PaymentReminder,
+    tplId?: string,
+    tab: 'templates' | 'design' | 'elements' | 'presets' = 'templates',
+    autoSend: boolean = false
+  ) => {
     setImageModalReminder(reminder);
     setSelectedImageTemplateId(tplId || null);
+    setImageModalTab(tab);
+    setAutoSendWhatsAppImage(autoSend);
     setIsImageModalOpen(true);
   };
 
@@ -1064,7 +1084,7 @@ export function PaymentRemindersView() {
 
                     {/* Visual Image Card Generator Button */}
                     <button
-                      onClick={() => handleOpenImageModal(reminder)}
+                      onClick={() => handleCardImageButtonClick(reminder)}
                       className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/50 text-[11px] font-semibold transition-all shadow-2xs cursor-pointer active:scale-95 border border-blue-200 dark:border-blue-800/80"
                       title="Generate Customized Visual Image Template with QR Code"
                     >
@@ -1798,17 +1818,41 @@ export function PaymentRemindersView() {
         </div>
       </Modal>
 
-      {/* Visual Image Template Customizer Modal */}
+      {/* Quick Template Picker Prompt Modal */}
+      <TemplatePickerModal
+        isOpen={isTemplatePickerOpen}
+        onClose={() => {
+          setIsTemplatePickerOpen(false);
+          setTemplatePickerReminder(null);
+        }}
+        reminder={templatePickerReminder}
+        company={currentCompany}
+        onSelectTemplate={(templateId, action) => {
+          if (templatePickerReminder) {
+            handleOpenImageModal(
+              templatePickerReminder,
+              templateId,
+              action === 'customize' ? 'design' : 'templates',
+              action === 'whatsapp'
+            );
+          }
+        }}
+      />
+
+      {/* Visual Image Template Customizer Studio Modal */}
       <ReminderImageModal
         isOpen={isImageModalOpen}
         onClose={() => {
           setIsImageModalOpen(false);
           setImageModalReminder(null);
           setSelectedImageTemplateId(null);
+          setAutoSendWhatsAppImage(false);
         }}
         reminder={imageModalReminder}
         company={currentCompany}
         initialTemplateId={selectedImageTemplateId}
+        initialTab={imageModalTab}
+        autoSendWhatsApp={autoSendWhatsAppImage}
       />
     </div>
   );

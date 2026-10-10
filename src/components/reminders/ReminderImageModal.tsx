@@ -45,8 +45,24 @@ import {
   Unlock,
   ShieldCheck,
   Sticker,
-  Landmark
+  Landmark,
+  Share2,
+  MessageCircle,
+  FileText,
+  User,
+  Calendar,
+  DollarSign,
+  Percent,
+  Receipt
 } from 'lucide-react';
+
+export interface LineItem {
+  id: string;
+  description: string;
+  qty: number;
+  rate: number;
+  tax: number;
+}
 
 interface ReminderImageModalProps {
   isOpen: boolean;
@@ -54,6 +70,8 @@ interface ReminderImageModalProps {
   reminder: PaymentReminder | null;
   company: Company;
   initialTemplateId?: string | null;
+  initialTab?: 'templates' | 'design' | 'elements' | 'presets' | 'invoice';
+  autoSendWhatsApp?: boolean;
 }
 
 export type CardTheme =
@@ -340,7 +358,9 @@ export function ReminderImageModal({
   onClose,
   reminder,
   company,
-  initialTemplateId
+  initialTemplateId,
+  initialTab = 'templates',
+  autoSendWhatsApp = false
 }: ReminderImageModalProps) {
   const { accounts } = useApp();
   const cardRef = useRef<HTMLDivElement>(null);
@@ -367,7 +387,23 @@ export function ReminderImageModal({
   const [isCopied, setIsCopied] = useState(false);
   const [bgAccent, setBgAccent] = useState('#10b981'); // Customizable Accent Color
   const [showWatermark, setShowWatermark] = useState(true);
-  const [activeTab, setActiveTab] = useState<'templates' | 'design' | 'elements' | 'presets'>('templates');
+  const [activeTab, setActiveTab] = useState<'templates' | 'design' | 'elements' | 'presets' | 'invoice'>(initialTab);
+
+  // Structured Invoice & Itemized Breakdown State (As requested by user screenshot)
+  const [useItemizedInvoice, setUseItemizedInvoice] = useState(false);
+  const [billToName, setBillToName] = useState('');
+  const [billToEmail, setBillToEmail] = useState('');
+  const [billToAddress, setBillToAddress] = useState('');
+  const [billFromAddress, setBillFromAddress] = useState('');
+  const [invoiceNumber, setInvoiceNumber] = useState('');
+  const [issueDate, setIssueDate] = useState('');
+  const [dueDate, setDueDate] = useState('');
+  const [currencySymbol, setCurrencySymbol] = useState(company.currency || 'USD');
+  const [lineItems, setLineItems] = useState<LineItem[]>([
+    { id: 'item-1', description: 'Design & Consultation Services', qty: 1, rate: 0, tax: 0 }
+  ]);
+  const [discountAmount, setDiscountAmount] = useState<number>(0);
+  const [taxPercent, setTaxPercent] = useState<number>(0);
 
   // Advanced Canvas Studio State: Freeform Drag & Drop & Element Sizing
   const [dragMode, setDragMode] = useState<boolean>(false);
@@ -401,6 +437,25 @@ export function ReminderImageModal({
       const firstBankUpi = accounts.find((a) => a.type === 'bank' && a.upi_id && a.upi_id.trim().length > 0)?.upi_id;
       setCustomUpiId(firstBankUpi || company.tax_id || 'business@upi');
 
+      // Populate structured invoice fields from reminder & company
+      setBillToName(reminder.party_name || '');
+      setBillToEmail('');
+      setBillToAddress(reminder.phone ? `Phone: ${reminder.phone}` : '');
+      setBillFromAddress(`${company.name}, Head Office`);
+      setInvoiceNumber(reminder.invoice_ref || `#INV-${reminder.id.slice(0, 5).toUpperCase()}`);
+      setIssueDate(formatDate(reminder.created_at || new Date().toISOString()));
+      setDueDate(formatDate(reminder.due_date));
+      setCurrencySymbol(company.currency || 'USD');
+      setLineItems([
+        {
+          id: 'item-1',
+          description: reminder.title || 'Professional Services',
+          qty: 1,
+          rate: Number(reminder.amount) || 0,
+          tax: 0
+        }
+      ]);
+
       // If a specific template was requested, apply it
       if (initialTemplateId) {
         const found = CARD_TEMPLATES.find((t) => t.id === initialTemplateId);
@@ -422,8 +477,11 @@ export function ReminderImageModal({
         { id: 'el-qr', type: 'qr', x: 64, y: 66, scale: 1, visible: true },
         { id: 'el-footer', type: 'footer', x: 5, y: 70, scale: 1, visible: true }
       ]);
+      if (initialTab) {
+        setActiveTab(initialTab);
+      }
     }
-  }, [reminder, company, initialTemplateId]);
+  }, [reminder, company, initialTemplateId, initialTab]);
 
   // Global mouse up event listener to release any active dragging
   useEffect(() => {
@@ -455,22 +513,20 @@ export function ReminderImageModal({
       .catch((err) => console.error('Failed to generate QR code', err));
   }, [reminder, showQrCode, customUpiId, company.name]);
 
-  if (!reminder) return null;
-
-  const isCollect = reminder.reminder_type === 'to_collect';
-  const formattedAmt = formatCurrency(reminder.amount, company.currency);
+  const isCollect = reminder?.reminder_type === 'to_collect';
+  const formattedAmt = reminder ? formatCurrency(reminder.amount, company.currency) : '';
 
   // Aspect Ratio Dimensions helper
   const getAspectRatioClasses = () => {
     switch (aspectRatio) {
       case 'portrait':
-        return 'w-full max-w-[460px] min-h-[580px] h-[580px]';
+        return 'w-full max-w-[460px] min-h-[520px] sm:min-h-[580px] h-[540px] sm:h-[580px]';
       case 'square':
-        return 'w-full max-w-[480px] min-h-[480px] h-[480px]';
+        return 'w-full max-w-[460px] min-h-[420px] sm:min-h-[480px] h-[440px] sm:h-[480px]';
       case 'story':
-        return 'w-full max-w-[390px] min-h-[640px] h-[640px]';
+        return 'w-full max-w-[380px] min-h-[580px] sm:min-h-[640px] h-[600px] sm:h-[640px]';
       case 'landscape':
-        return 'w-full max-w-[540px] min-h-[420px] h-[420px]';
+        return 'w-full max-w-[540px] min-h-[380px] sm:min-h-[420px] h-[400px] sm:h-[420px]';
     }
   };
 
@@ -804,18 +860,106 @@ export function ReminderImageModal({
     }
   };
 
+  // Direct Send / Share to WhatsApp with Image
+  const [isSharingWhatsApp, setIsSharingWhatsApp] = useState(false);
+  const handleShareToWhatsApp = async () => {
+    if (!cardRef.current || !reminder) return;
+    try {
+      setIsSharingWhatsApp(true);
+      setIsGenerating(true);
+
+      const blob = await toPng(cardRef.current, {
+        pixelRatio: 2,
+        quality: 0.95
+      }).then((res) => fetch(res).then((r) => r.blob()));
+
+      const fileName = `Reminder_${reminder.party_name || 'Bill'}_${reminder.due_date}.png`;
+      const file = new File([blob], fileName, { type: 'image/png' });
+
+      const shareText = `*${isCollect ? 'Payment Reminder' : 'Payment Advice'} from ${company.name}*\nDear ${reminder.party_name || 'Valued Client'},\nAmount: *${formattedAmt}*\nDue Date: *${formatDate(reminder.due_date)}*${reminder.invoice_ref ? `\nRef: ${reminder.invoice_ref}` : ''}${customUpiId ? `\nUPI: ${customUpiId}` : ''}\n\n${customFooterNote}`;
+
+      // Check if Web Share API with files is supported (works on Android / iOS / modern desktops)
+      if (typeof navigator !== 'undefined' && navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: `${company.name} Payment Reminder`,
+          text: shareText
+        });
+        return;
+      }
+
+      // If Web Share files is not supported (e.g. desktop browsers without OS share handler),
+      // Automatically copy image to clipboard and trigger WhatsApp web with pre-filled message
+      try {
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            'image/png': blob
+          })
+        ]);
+        setIsCopied(true);
+      } catch (clipErr) {
+        console.warn('Clipboard write failed, downloading image as fallback', clipErr);
+        // Fallback: download file so user has it immediately
+        const link = document.createElement('a');
+        link.download = fileName;
+        link.href = URL.createObjectURL(blob);
+        link.click();
+      }
+
+      let phoneDigits = reminder.phone ? reminder.phone.replace(/[^0-9]/g, '') : '';
+      if (phoneDigits && phoneDigits.length === 10) {
+        phoneDigits = `91${phoneDigits}`;
+      }
+
+      const waUrl = phoneDigits
+        ? `https://wa.me/${phoneDigits}?text=${encodeURIComponent(shareText)}`
+        : `https://wa.me/?text=${encodeURIComponent(shareText)}`;
+
+      window.open(waUrl, '_blank');
+      alert('Card image copied to your clipboard! Paste (Ctrl+V) directly into the opened WhatsApp chat window.');
+    } catch (err) {
+      console.error('Failed to share to WhatsApp', err);
+      // Fallback to opening whatsapp
+      let phoneDigits = reminder.phone ? reminder.phone.replace(/[^0-9]/g, '') : '';
+      if (phoneDigits && phoneDigits.length === 10) {
+        phoneDigits = `91${phoneDigits}`;
+      }
+      const waText = `*Payment Reminder from ${company.name}*\nAmount: *${formattedAmt}*`;
+      window.open(`https://wa.me/${phoneDigits}?text=${encodeURIComponent(waText)}`, '_blank');
+    } finally {
+      setIsGenerating(false);
+      setIsSharingWhatsApp(false);
+    }
+  };
+
+  // Auto trigger WhatsApp share if autoSendWhatsApp flag was requested from TemplatePicker
+  const autoSentRef = useRef(false);
+  useEffect(() => {
+    if (isOpen && autoSendWhatsApp && reminder && !autoSentRef.current) {
+      autoSentRef.current = true;
+      const timer = setTimeout(() => {
+        handleShareToWhatsApp();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+    if (!isOpen) {
+      autoSentRef.current = false;
+    }
+  }, [isOpen, autoSendWhatsApp, reminder]);
+
   const activeElement = elements.find((el) => el.id === activeElementId);
 
   return (
     <Modal
-      isOpen={isOpen}
+      isOpen={isOpen && !!reminder}
       onClose={onClose}
       title="Advanced Visual Reminder Studio (Drag & Drop Canvas & Styling)"
       maxWidth="5xl"
     >
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      {!reminder ? null : (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left Column: Interactive Visual Canvas */}
-        <div className="lg:col-span-7 flex flex-col items-center select-none">
+        <div className="lg:col-span-7 flex flex-col items-center select-none w-full min-w-0">
           <div className="w-full flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
@@ -845,21 +989,22 @@ export function ReminderImageModal({
             </button>
           </div>
 
-          {/* THE DRAGGABLE CANVAS CARD CONTAINER */}
-          <div
-            ref={cardRef}
-            onClick={() => setActiveElementId(null)}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            className={`${getAspectRatioClasses()} rounded-3xl p-6 border shadow-2xl relative overflow-hidden transition-all ${
-              currentTheme.container
-            } ${fontFamily} ${dragMode ? 'cursor-crosshair ring-2 ring-amber-500/50' : ''}`}
-            style={{
-              borderRadius: `${cardBorderRadius}px`,
-              padding: `${cardPadding}px`,
-              boxShadow: `0 20px 40px -15px ${bgAccent}25`
-            }}
-          >
+          {/* THE DRAGGABLE CANVAS CARD CONTAINER WRAPPER */}
+          <div className="w-full flex justify-center overflow-x-auto py-1">
+            <div
+              ref={cardRef}
+              onClick={() => setActiveElementId(null)}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              className={`${getAspectRatioClasses()} rounded-3xl p-6 border shadow-2xl relative overflow-hidden transition-all shrink-0 ${
+                currentTheme.container
+              } ${fontFamily} ${dragMode ? 'cursor-crosshair ring-2 ring-amber-500/50' : ''}`}
+              style={{
+                borderRadius: `${cardBorderRadius}px`,
+                padding: `${cardPadding}px`,
+                boxShadow: `0 20px 40px -15px ${bgAccent}25`
+              }}
+            >
             {/* Background Aesthetic Ambient Glow & Textures */}
             <div
               className="absolute -top-24 -right-24 w-60 h-60 rounded-full blur-3xl pointer-events-none opacity-40"
@@ -932,6 +1077,207 @@ export function ReminderImageModal({
               />
             )}
 
+            {/* CONDITIONAL: Render either Clean Itemized Invoice Card (User Screenshot) or Freeform Studio Canvas */}
+            {useItemizedInvoice ? (
+              <div className="w-full h-full flex flex-col justify-between text-slate-800 dark:text-slate-100 font-sans z-10 relative">
+                {/* Invoice Top Header */}
+                <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-700/80">
+                  <div className="flex items-center gap-2.5">
+                    <div
+                      className="w-8 h-8 rounded-xl flex items-center justify-center font-black text-white text-base shadow-sm"
+                      style={{ backgroundColor: bgAccent }}
+                    >
+                      {company.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <span className="font-extrabold text-sm tracking-tight text-slate-900 dark:text-white">
+                        {company.name}
+                      </span>
+                    </div>
+                  </div>
+                  <span className="text-[11px] text-slate-400 font-medium">
+                    {company.tax_id ? `GST / Tax: ${company.tax_id}` : 'Commercial District, HQ'}
+                  </span>
+                </div>
+
+                {/* Subheader: App Icon / Logo + Invoice Meta */}
+                <div className="pt-3 pb-2">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-slate-900 to-slate-800 text-white flex items-center justify-center shadow-lg border border-white/20">
+                        <FileText className="w-6 h-6 text-amber-400" />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-xs text-slate-900 dark:text-white">
+                          Invoice from {company.name}
+                        </h4>
+                        <p className="text-[11px] font-mono font-semibold text-slate-400">
+                          ID: {invoiceNumber || '#0045'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="text-right text-[11px] space-y-0.5">
+                      <div className="text-slate-400">
+                        Issue Date:{' '}
+                        <strong className="text-slate-700 dark:text-slate-200 font-semibold">
+                          {issueDate || '01 Mar, 2025'}
+                        </strong>
+                      </div>
+                      <div className="text-slate-400">
+                        Due Date:{' '}
+                        <strong className="text-slate-700 dark:text-slate-200 font-semibold">
+                          {dueDate || '31 Mar, 2025'}
+                        </strong>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bill from & Bill to Columns */}
+                <div className="grid grid-cols-2 gap-6 py-2.5 border-t border-slate-100 dark:border-slate-800 text-[11px]">
+                  <div>
+                    <span className="text-slate-400 block mb-0.5 font-medium">Bill from:</span>
+                    <strong className="font-bold text-slate-900 dark:text-white block text-xs">
+                      {company.name}
+                    </strong>
+                    <p className="text-slate-500 dark:text-slate-400 leading-snug">
+                      {billFromAddress || `${company.name}, Head Office`}
+                    </p>
+                  </div>
+
+                  <div>
+                    <span className="text-slate-400 block mb-0.5 font-medium">Bill to:</span>
+                    <strong className="font-bold text-slate-900 dark:text-white block text-xs">
+                      {billToName || reminder.party_name || 'Client Name'}
+                    </strong>
+                    <p className="text-slate-500 dark:text-slate-400 leading-snug">
+                      {billToAddress || (billToEmail ? billToEmail : 'Client Address')}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Itemized Table */}
+                <div className="my-2 rounded-2xl bg-slate-50/80 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 p-3">
+                  <div className="grid grid-cols-12 text-[10px] font-bold text-slate-400 pb-2 border-b border-slate-200/60 dark:border-slate-800 uppercase tracking-wider">
+                    <span className="col-span-6">Item</span>
+                    <span className="col-span-2 text-center">QTY</span>
+                    <span className="col-span-2 text-right">Rate</span>
+                    <span className="col-span-2 text-right">Amount</span>
+                  </div>
+
+                  <div className="divide-y divide-slate-100 dark:divide-slate-800/60 max-h-36 overflow-y-auto pr-1">
+                    {lineItems.map((item, idx) => {
+                      const itemAmt = (item.qty || 1) * (item.rate || 0);
+                      return (
+                        <div key={item.id || idx} className="grid grid-cols-12 text-xs py-2 items-center">
+                          <span className="col-span-6 font-semibold text-slate-800 dark:text-slate-200 truncate pr-2">
+                            {item.description || 'Service/Product'}
+                          </span>
+                          <span className="col-span-2 text-center font-bold text-slate-600 dark:text-slate-400 font-mono">
+                            {item.qty || 1}
+                          </span>
+                          <span className="col-span-2 text-right text-slate-600 dark:text-slate-400 font-mono">
+                            {currencySymbol === 'INR' ? '₹' : '$'}
+                            {(item.rate || 0).toLocaleString()}
+                          </span>
+                          <span className="col-span-2 text-right font-bold text-slate-900 dark:text-white font-mono">
+                            {currencySymbol === 'INR' ? '₹' : '$'}
+                            {itemAmt.toLocaleString()}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Bottom Calculation Summary & UPI Badge */}
+                <div className="pt-2 flex items-end justify-between">
+                  {/* Left Bottom UPI & QR if enabled */}
+                  <div className="flex items-center gap-2">
+                    {showQrCode && qrDataUrl && (
+                      <div className="w-16 h-16 p-1 bg-white rounded-xl shadow-xs border border-slate-200 shrink-0">
+                        <img src={qrDataUrl} alt="UPI QR" className="w-full h-full object-contain" />
+                      </div>
+                    )}
+                    <div className="text-[10px] space-y-0.5 text-slate-400">
+                      {customUpiId && (
+                        <div>
+                          <span>Scan to Pay UPI:</span>
+                          <span className="font-mono font-bold block text-slate-700 dark:text-slate-200">
+                            {customUpiId}
+                          </span>
+                        </div>
+                      )}
+                      <p className="italic text-[9px] line-clamp-1">{customFooterNote}</p>
+                    </div>
+                  </div>
+
+                  {/* Right Bottom Financial Totals */}
+                  <div className="w-48 space-y-1 text-xs">
+                    <div className="flex justify-between text-slate-500 dark:text-slate-400">
+                      <span>Subtotal</span>
+                      <span className="font-mono font-semibold">
+                        {currencySymbol === 'INR' ? '₹' : '$'}
+                        {lineItems
+                          .reduce((acc, it) => acc + (it.qty || 1) * (it.rate || 0), 0)
+                          .toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between text-slate-500 dark:text-slate-400">
+                      <span>Discount</span>
+                      <span className="font-mono">
+                        {discountAmount > 0
+                          ? `-${currencySymbol === 'INR' ? '₹' : '$'}${discountAmount.toLocaleString()}`
+                          : '0%'}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between text-slate-500 dark:text-slate-400">
+                      <span>Tax</span>
+                      <span className="font-mono">
+                        {currencySymbol === 'INR' ? '₹' : '$'}
+                        {(() => {
+                          const sub = lineItems.reduce((acc, it) => acc + (it.qty || 1) * (it.rate || 0), 0);
+                          const afterDisc = Math.max(0, sub - (discountAmount || 0));
+                          const itemTax = lineItems.reduce(
+                            (acc, it) => acc + ((it.qty || 1) * (it.rate || 0) * (it.tax || 0)) / 100,
+                            0
+                          );
+                          const extraTax = (afterDisc * (taxPercent || 0)) / 100;
+                          return (itemTax + extraTax).toLocaleString('en-US', {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2
+                          });
+                        })()}
+                      </span>
+                    </div>
+
+                    <div className="pt-1.5 border-t border-slate-200 dark:border-slate-700 flex justify-between font-black text-slate-900 dark:text-white text-sm">
+                      <span>Total</span>
+                      <span className="font-mono" style={{ color: bgAccent }}>
+                        {currencySymbol === 'INR' ? '₹' : '$'}
+                        {(() => {
+                          const sub = lineItems.reduce((acc, it) => acc + (it.qty || 1) * (it.rate || 0), 0);
+                          const afterDisc = Math.max(0, sub - (discountAmount || 0));
+                          const itemTax = lineItems.reduce(
+                            (acc, it) => acc + ((it.qty || 1) * (it.rate || 0) * (it.tax || 0)) / 100,
+                            0
+                          );
+                          const extraTax = (afterDisc * (taxPercent || 0)) / 100;
+                          return (afterDisc + itemTax + extraTax).toLocaleString('en-US', {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2
+                          });
+                        })()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <>
             {/* Render Canvas Elements with dynamic scaling & position */}
             {elements.map((el) => {
               if (!el.visible) return null;
@@ -1133,6 +1479,8 @@ export function ReminderImageModal({
                 </div>
               );
             })}
+              </>
+            )}
 
             {/* Sub-footer bottom brand banner */}
             {showWatermark && (
@@ -1142,26 +1490,40 @@ export function ReminderImageModal({
               </div>
             )}
           </div>
+          </div>
 
           {/* Action Buttons under Canvas */}
-          <div className="flex items-center gap-2.5 mt-4 w-full max-w-[480px]">
+          <div className="flex flex-col sm:flex-row items-center gap-2 mt-4 w-full max-w-[480px]">
             <Button
-              onClick={handleDownloadImage}
-              disabled={isGenerating}
-              className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 text-xs shadow-md cursor-pointer"
+              onClick={handleShareToWhatsApp}
+              disabled={isGenerating || isSharingWhatsApp}
+              className="w-full sm:flex-1 bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 text-xs shadow-md cursor-pointer shrink-0"
             >
-              <Download className="w-3.5 h-3.5" />
-              <span>{isGenerating ? 'Generating...' : 'Download High-Res PNG'}</span>
+              <MessageCircle className="w-3.5 h-3.5" />
+              <span>{isSharingWhatsApp ? 'Opening WhatsApp...' : 'Send Card via WhatsApp'}</span>
             </Button>
-            <Button
-              variant="outline"
-              onClick={handleCopyImage}
-              disabled={isGenerating}
-              className="flex-1 gap-1.5 text-xs cursor-pointer"
-            >
-              {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5 text-slate-500" />}
-              <span>{isCopied ? 'Copied Image!' : 'Copy to Clipboard'}</span>
-            </Button>
+            <div className="flex items-center gap-2 w-full sm:flex-1">
+              <Button
+                variant="outline"
+                onClick={handleDownloadImage}
+                disabled={isGenerating}
+                className="flex-1 gap-1 text-xs cursor-pointer px-2"
+                title="Download High-Res PNG"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span className="truncate">Download PNG</span>
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleCopyImage}
+                disabled={isGenerating}
+                className="flex-1 gap-1 text-xs cursor-pointer px-2"
+                title="Copy Image to Clipboard"
+              >
+                {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5 text-slate-500" />}
+                <span className="truncate">{isCopied ? 'Copied!' : 'Copy'}</span>
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -1171,7 +1533,25 @@ export function ReminderImageModal({
           <div className="flex items-center gap-1 bg-white dark:bg-slate-900 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
             <button
               type="button"
-              onClick={() => setActiveTab('templates')}
+              onClick={() => {
+                setActiveTab('invoice');
+                setUseItemizedInvoice(true);
+              }}
+              className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1 ${
+                activeTab === 'invoice'
+                  ? 'bg-amber-600 text-white shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`}
+            >
+              <Receipt className="w-3.5 h-3.5" />
+              <span>Invoice Form</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('templates');
+                setUseItemizedInvoice(false);
+              }}
               className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1 ${
                 activeTab === 'templates'
                   ? 'bg-emerald-600 text-white shadow-xs'
@@ -1183,7 +1563,10 @@ export function ReminderImageModal({
             </button>
             <button
               type="button"
-              onClick={() => setActiveTab('design')}
+              onClick={() => {
+                setActiveTab('design');
+                setUseItemizedInvoice(false);
+              }}
               className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
                 activeTab === 'design'
                   ? 'bg-blue-600 text-white'
@@ -1194,7 +1577,10 @@ export function ReminderImageModal({
             </button>
             <button
               type="button"
-              onClick={() => setActiveTab('elements')}
+              onClick={() => {
+                setActiveTab('elements');
+                setUseItemizedInvoice(false);
+              }}
               className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
                 activeTab === 'elements'
                   ? 'bg-blue-600 text-white'
@@ -1205,7 +1591,10 @@ export function ReminderImageModal({
             </button>
             <button
               type="button"
-              onClick={() => setActiveTab('presets')}
+              onClick={() => {
+                setActiveTab('presets');
+                setUseItemizedInvoice(false);
+              }}
               className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
                 activeTab === 'presets'
                   ? 'bg-blue-600 text-white'
@@ -1215,6 +1604,350 @@ export function ReminderImageModal({
               Stickers
             </button>
           </div>
+
+          {/* TAB: STRUCTURED INVOICE CUSTOMIZER (Matches User Screenshot) */}
+          {activeTab === 'invoice' && (
+            <div className="space-y-4 text-xs">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-700">
+                <div>
+                  <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                    <Receipt className="w-4 h-4 text-amber-500" />
+                    <span>Invoice Details</span>
+                  </h4>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Customize client, itemized line items, rates, taxes & invoice meta
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setUseItemizedInvoice(!useItemizedInvoice)}
+                  className={`px-2.5 py-1 rounded-full text-[10px] font-bold border transition-colors cursor-pointer ${
+                    useItemizedInvoice
+                      ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
+                      : 'bg-slate-200 text-slate-600 border-slate-300'
+                  }`}
+                >
+                  {useItemizedInvoice ? '✓ Invoice Card Mode' : 'Standard Card Mode'}
+                </button>
+              </div>
+
+              {/* Bill To & Client */}
+              <div className="space-y-1.5">
+                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                  Bill To (Client / Customer)
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={billToName}
+                    onChange={(e) => setBillToName(e.target.value)}
+                    placeholder="e.g. Johnathon Doe"
+                    className="w-full bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-xs rounded-xl px-3 py-2 border border-slate-300 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-500 font-semibold"
+                  />
+                  <User className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-3 pointer-events-none" />
+                </div>
+              </div>
+
+              {/* Email Address */}
+              <div className="space-y-1">
+                <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+                  Client Email / Contact
+                </label>
+                <input
+                  type="text"
+                  value={billToEmail}
+                  onChange={(e) => setBillToEmail(e.target.value)}
+                  placeholder="e.g. john_doe@gmail.com"
+                  className="w-full bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-xs rounded-xl px-3 py-2 border border-slate-300 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+              </div>
+
+              {/* Address */}
+              <div className="space-y-1">
+                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                  Address
+                </label>
+                <input
+                  type="text"
+                  value={billToAddress}
+                  onChange={(e) => setBillToAddress(e.target.value)}
+                  placeholder="e.g. 16/345 Palatial Avenue, South Mascot, 2026"
+                  className="w-full bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-xs rounded-xl px-3 py-2 border border-slate-300 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+              </div>
+
+              {/* Invoice Number & Currency */}
+              <div className="grid grid-cols-2 gap-2.5">
+                <div className="space-y-1">
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                    Invoice Number
+                  </label>
+                  <input
+                    type="text"
+                    value={invoiceNumber}
+                    onChange={(e) => setInvoiceNumber(e.target.value)}
+                    placeholder="#0045"
+                    className="w-full bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-xs rounded-xl px-3 py-2 border border-slate-300 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-500 font-mono font-bold"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                    Currency
+                  </label>
+                  <select
+                    value={currencySymbol}
+                    onChange={(e) => setCurrencySymbol(e.target.value)}
+                    className="w-full bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-xs rounded-xl px-3 py-2 border border-slate-300 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-500 font-semibold cursor-pointer"
+                  >
+                    <option value="USD">🇺🇸 USD ($)</option>
+                    <option value="INR">🇮🇳 INR (₹)</option>
+                    <option value="EUR">🇪🇺 EUR (€)</option>
+                    <option value="GBP">🇬🇧 GBP (£)</option>
+                    <option value="AED">🇦🇪 AED (AED)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Issue Date & Due Date */}
+              <div className="grid grid-cols-2 gap-2.5">
+                <div className="space-y-1">
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                    Issue Date
+                  </label>
+                  <input
+                    type="text"
+                    value={issueDate}
+                    onChange={(e) => setIssueDate(e.target.value)}
+                    placeholder="28 March, 2025"
+                    className="w-full bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-xs rounded-xl px-3 py-2 border border-slate-300 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                    Due Date
+                  </label>
+                  <input
+                    type="text"
+                    value={dueDate}
+                    onChange={(e) => setDueDate(e.target.value)}
+                    placeholder="28 March, 2025"
+                    className="w-full bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-xs rounded-xl px-3 py-2 border border-slate-300 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-500 font-semibold"
+                  />
+                </div>
+              </div>
+
+              {/* Items Section */}
+              <div className="pt-2 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <h5 className="font-bold text-xs text-slate-900 dark:text-slate-100">
+                    Items ({lineItems.length})
+                  </h5>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newId = `item-${Date.now()}`;
+                      setLineItems((prev) => [
+                        ...prev,
+                        { id: newId, description: '', qty: 1, rate: 0, tax: 0 }
+                      ]);
+                    }}
+                    className="text-amber-600 dark:text-amber-400 font-bold hover:underline flex items-center gap-1 cursor-pointer text-xs"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add Item</span>
+                  </button>
+                </div>
+
+                <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
+                  {lineItems.map((item, idx) => (
+                    <div
+                      key={item.id}
+                      className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 shadow-xs space-y-2.5"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-xs text-slate-500">
+                          #{String(idx + 1).padStart(2, '0')}
+                        </span>
+                        {lineItems.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setLineItems((prev) => prev.filter((i) => i.id !== item.id));
+                            }}
+                            className="text-slate-400 hover:text-rose-500 transition-colors cursor-pointer"
+                            title="Remove item"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Item Description */}
+                      <div>
+                        <label className="text-[10px] text-slate-400 font-semibold block mb-0.5">
+                          Description
+                        </label>
+                        <input
+                          type="text"
+                          value={item.description}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setLineItems((prev) =>
+                              prev.map((i) => (i.id === item.id ? { ...i, description: val } : i))
+                            );
+                          }}
+                          placeholder="e.g. UI/UX review of all web products"
+                          className="w-full bg-slate-50 dark:bg-slate-800/80 text-slate-900 dark:text-slate-100 text-xs rounded-xl px-3 py-1.5 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                        />
+                      </div>
+
+                      {/* Rate, QTY, Tax */}
+                      <div className="grid grid-cols-12 gap-2">
+                        <div className="col-span-5">
+                          <label className="text-[10px] text-slate-400 font-semibold block mb-0.5">
+                            Rate
+                          </label>
+                          <div className="relative">
+                            <span className="absolute left-2.5 top-1.5 text-xs text-slate-400 font-bold">
+                              {currencySymbol === 'INR' ? '₹' : '$'}
+                            </span>
+                            <input
+                              type="number"
+                              value={item.rate || ''}
+                              onChange={(e) => {
+                                const val = parseFloat(e.target.value) || 0;
+                                setLineItems((prev) =>
+                                  prev.map((i) => (i.id === item.id ? { ...i, rate: val } : i))
+                                );
+                              }}
+                              placeholder="120.00"
+                              className="w-full bg-slate-50 dark:bg-slate-800/80 text-slate-900 dark:text-slate-100 text-xs rounded-xl pl-6 pr-2 py-1.5 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-1 focus:ring-amber-500 font-semibold font-mono"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="col-span-3">
+                          <label className="text-[10px] text-slate-400 font-semibold block mb-0.5">
+                            QTY
+                          </label>
+                          <input
+                            type="number"
+                            min="1"
+                            value={item.qty || 1}
+                            onChange={(e) => {
+                              const val = Math.max(1, parseInt(e.target.value) || 1);
+                              setLineItems((prev) =>
+                                prev.map((i) => (i.id === item.id ? { ...i, qty: val } : i))
+                              );
+                            }}
+                            className="w-full bg-slate-50 dark:bg-slate-800/80 text-slate-900 dark:text-slate-100 text-xs rounded-xl px-2.5 py-1.5 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-1 focus:ring-amber-500 text-center font-bold"
+                          />
+                        </div>
+
+                        <div className="col-span-4">
+                          <label className="text-[10px] text-slate-400 font-semibold block mb-0.5">
+                            Tax %
+                          </label>
+                          <div className="relative">
+                            <input
+                              type="number"
+                              value={item.tax || ''}
+                              onChange={(e) => {
+                                const val = parseFloat(e.target.value) || 0;
+                                setLineItems((prev) =>
+                                  prev.map((i) => (i.id === item.id ? { ...i, tax: val } : i))
+                                );
+                              }}
+                              placeholder="10"
+                              className="w-full bg-slate-50 dark:bg-slate-800/80 text-slate-900 dark:text-slate-100 text-xs rounded-xl pr-6 pl-2 py-1.5 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-1 focus:ring-amber-500 text-right font-semibold"
+                            />
+                            <span className="absolute right-2 top-1.5 text-xs text-slate-400 font-bold">
+                              %
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newId = `item-${Date.now()}`;
+                    setLineItems((prev) => [
+                      ...prev,
+                      { id: newId, description: '', qty: 1, rate: 0, tax: 0 }
+                    ]);
+                  }}
+                  className="w-full py-2 border-2 border-dashed border-amber-300 dark:border-amber-800/60 rounded-xl text-amber-600 dark:text-amber-400 font-bold text-xs hover:bg-amber-50 dark:hover:bg-amber-950/20 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>+ Add Item</span>
+                </button>
+              </div>
+
+              {/* Financial Calculation Summary Pill */}
+              <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 rounded-2xl space-y-1.5">
+                <div className="flex justify-between text-xs text-slate-600 dark:text-slate-300">
+                  <span>Subtotal</span>
+                  <span className="font-semibold font-mono">
+                    {currencySymbol === 'INR' ? '₹' : '$'}
+                    {lineItems
+                      .reduce((acc, it) => acc + (it.qty || 1) * (it.rate || 0), 0)
+                      .toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-xs text-slate-600 dark:text-slate-300">
+                  <span>Discount</span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] text-slate-400">{currencySymbol === 'INR' ? '₹' : '$'}</span>
+                    <input
+                      type="number"
+                      value={discountAmount || ''}
+                      onChange={(e) => setDiscountAmount(parseFloat(e.target.value) || 0)}
+                      placeholder="0"
+                      className="w-16 bg-white dark:bg-slate-900 border rounded px-1.5 py-0.5 text-right text-xs font-mono"
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-between items-center text-xs text-slate-600 dark:text-slate-300">
+                  <span>Tax Percent (%)</span>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      value={taxPercent || ''}
+                      onChange={(e) => setTaxPercent(parseFloat(e.target.value) || 0)}
+                      placeholder="0"
+                      className="w-16 bg-white dark:bg-slate-900 border rounded px-1.5 py-0.5 text-right text-xs font-mono"
+                    />
+                    <span className="text-[10px] text-slate-400">%</span>
+                  </div>
+                </div>
+                <div className="pt-1.5 border-t border-amber-200 dark:border-amber-900/50 flex justify-between text-xs font-black text-slate-900 dark:text-white">
+                  <span>Total Amount</span>
+                  <span className="text-amber-600 dark:text-amber-400 font-mono text-sm">
+                    {currencySymbol === 'INR' ? '₹' : '$'}
+                    {(() => {
+                      const sub = lineItems.reduce((acc, it) => acc + (it.qty || 1) * (it.rate || 0), 0);
+                      const afterDisc = Math.max(0, sub - (discountAmount || 0));
+                      const itemTax = lineItems.reduce(
+                        (acc, it) => acc + ((it.qty || 1) * (it.rate || 0) * (it.tax || 0)) / 100,
+                        0
+                      );
+                      const extraTax = (afterDisc * (taxPercent || 0)) / 100;
+                      return (afterDisc + itemTax + extraTax).toLocaleString('en-US', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                      });
+                    })()}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* TAB 0: 10 DESIGN TEMPLATES GALLERY */}
           {activeTab === 'templates' && (
@@ -1820,6 +2553,7 @@ export function ReminderImageModal({
           </div>
         </div>
       </div>
+      )}
     </Modal>
   );
 }
